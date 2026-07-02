@@ -2,6 +2,9 @@
 Entry point. Wires up all routers, creates DB tables on startup (fine for
 POC -- use Alembic migrations if this grows past the POC), pre-warms Ollama.
 """
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,6 +15,7 @@ from app.routers import (
     auth, employees, hrms_sync, onboarding, offboarding,
     access, assets, approvals, reports, audit,
 )
+
 
 app = FastAPI(title="Onboarding/Offboarding POC API")
 

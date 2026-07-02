@@ -8,7 +8,7 @@
     "location": "New York",
     "manager_name": "David Klein",
     "start_date": "2026-07-10",
-    "synced": false
+    "synced": true
   },
   {
     "hrms_employee_id": "EMP-1002",
@@ -30,6 +30,6 @@
     "location": "Bengaluru",
     "manager_name": "Divya Rao",
     "start_date": "2026-07-09",
-    "synced": false
+    "synced": true
   }
 ]
