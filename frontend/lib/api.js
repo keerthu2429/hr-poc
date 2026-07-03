@@ -51,4 +51,5 @@ export const api = {
   decideApproval: (id, role, status) =>
     request(`/approvals/${id}/${role}/decide`, { method: "POST", body: JSON.stringify({ status }) }),
   auditTrail: (id) => request(`/audit/${id}`),
+  dashboardSummary: () => request("/dashboard/summary"),
 };
