@@ -1,167 +1,412 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
+
+import { useRouter } from "next/navigation";
+
 import { api } from "../../lib/api";
+
 import { useAuth } from "../../lib/useAuth";
+
 import Sidebar from "../components/Sidebar";
+ 
+function Search({ className }: { className?: string }) {
 
-const TASK_STATUS_COLOR: Record<string, string> = {
-  approved: "#16a34a", rejected: "#dc2626", pending: "#eab308",
+  return (
+<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+<circle cx="11" cy="11" r="8" />
+<line x1="21" y1="21" x2="16.65" y2="16.65" />
+</svg>
+
+  );
+
+}
+ 
+function initials(name: string) {
+
+  return (name || "?")
+
+    .split(" ")
+
+    .filter(Boolean)
+
+    .slice(0, 2)
+
+    .map((p) => p[0]?.toUpperCase())
+
+    .join("");
+
+}
+ 
+const STATUS_STYLES: Record<string, string> = {
+
+  pending: "bg-amber-100 text-amber-700",
+
+  approved: "bg-green-100 text-green-700",
+
+  rejected: "bg-red-100 text-red-700",
+
 };
+ 
+type EmployeeSummary = {
 
-function TaskCard({ employeeId, task, workflow, onChanged }: { employeeId: string; task: any; workflow: "onboarding" | "offboarding"; onChanged: () => void }) {
-  const [saving, setSaving] = useState(false);
-  const [selection, setSelection] = useState<string[]>(task.selected_options || []);
+  employee_id: string;
 
-  const isEditable = task.status === "pending" && (task.task_type === "multi_select" || task.task_type === "single_select");
+  employee_name: string;
 
-  const updateSelection = workflow === "onboarding" ? api.updateTaskSelection : api.updateOffboardingTaskSelection;
-  const decideTask = workflow === "onboarding" ? api.decideTask : api.decideOffboardingTask;
+  department: string;
 
-  async function saveSelection(next: string[]) {
-    setSelection(next);
-    setSaving(true);
-    try {
-      await updateSelection(employeeId, task.id, next);
-    } finally {
-      setSaving(false);
-    }
-  }
+  role?: string;
 
-  function toggleOption(option: string) {
-    if (task.task_type === "single_select") {
-      saveSelection([option]);
-    } else {
-      const next = selection.includes(option) ? selection.filter((o) => o !== option) : [...selection, option];
-      saveSelection(next);
-    }
-  }
+  experience_level?: string;
 
-  async function decide(status: "approved" | "rejected") {
-    setSaving(true);
-    try {
-      await decideTask(employeeId, task.id, status);
-      onChanged();
-    } finally {
-      setSaving(false);
-    }
-  }
+  workflow_types: string[];
 
-  return (
-    <div style={{ background: "#fafafa", border: "1px solid #f0f0f0", borderRadius: 6, padding: 10, marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>
-          {task.task_name}
-          {!task.is_mandatory && <span style={{ fontSize: 11, color: "#999", marginLeft: 6 }}>(optional)</span>}
-          {task.category === "compliance" && <span style={{ fontSize: 11, color: "#6366f1", marginLeft: 6 }}>compliance</span>}
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: TASK_STATUS_COLOR[task.status] }}>{task.status}</div>
-      </div>
+  pendingCount: number;
 
-      {task.ai_recommendation && (
-        <div style={{ fontSize: 13, color: "#666", marginTop: 4, fontStyle: "italic" }}>
-          {task.is_ai_generated ? "🤖 " : ""}{task.ai_recommendation}
-        </div>
-      )}
+  totalCount: number;
 
-      {/* single_select: dropdown over the FULL catalog, AI's top pick pre-selected but changeable */}
-      {task.task_type === "single_select" && task.options && (
-        <div style={{ marginTop: 8 }}>
-          <select
-            value={selection[0] || ""}
-            disabled={!isEditable || saving}
-            onChange={(e) => toggleOption(e.target.value)}
-            style={{ fontSize: 13, padding: 4, width: "100%" }}
-          >
-            <option value="" disabled>Select…</option>
-            {task.options.map((opt: string) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-      )}
+  overallStatus: "pending" | "approved" | "rejected";
 
-      {/* multi_select: editable checklist, AI's suggestion pre-checked but changeable */}
-      {task.task_type === "multi_select" && task.options && (
-        <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {task.options.map((opt: string) => (
-            <label key={opt} style={{
-              fontSize: 12, padding: "3px 8px", borderRadius: 4,
-              background: selection.includes(opt) ? "#e0e7ff" : "#fff",
-              border: "1px solid #ddd", cursor: isEditable ? "pointer" : "default",
-            }}>
-              <input
-                type="checkbox"
-                checked={selection.includes(opt)}
-                disabled={!isEditable || saving}
-                onChange={() => toggleOption(opt)}
-                style={{ marginRight: 4 }}
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-      )}
+};
+ 
+export default function ApprovalsDirectoryPage() {
 
-      {task.status === "pending" && (
-        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-          <button onClick={() => decide("approved")} disabled={saving} style={{ fontSize: 12, padding: "3px 10px" }}>
-            Approve
-          </button>
-          <button onClick={() => decide("rejected")} disabled={saving} style={{ fontSize: 12, padding: "3px 10px" }}>
-            Reject
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function ApprovalsPage() {
   const { role } = useAuth();
+
+  const router = useRouter();
+ 
   const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  async function load() {
-    if (!role) return;
-    setLoading(true);
-    const data = await api.approvalsForRole(role);
-    setItems(data);
-    setLoading(false);
-  }
+  const [loading, setLoading] = useState(true);
 
+  const [search, setSearch] = useState("");
+
+  const [department, setDepartment] = useState("all");
+ 
   useEffect(() => {
+
     load();
+
   }, [role]);
+ 
+  async function load() {
 
+    if (!role) return;
+
+    setLoading(true);
+
+    const data = await api.approvalsForRole(role);
+
+    setItems(data);
+
+    setLoading(false);
+
+  }
+ 
+  // Group raw approval items (which can be per workflow) into one row per employee
+
+  const employees: EmployeeSummary[] = useMemo(() => {
+
+    const map = new Map<string, EmployeeSummary>();
+ 
+    items.forEach((item: any) => {
+
+      const existing = map.get(item.employee_id);
+
+      const pending =
+
+        item.workflow_type === "onboarding"
+
+          ? (item.tasks || []).filter((t: any) => t.status === "pending").length
+
+          : item.approval_status === "pending" ? 1 : 0;
+
+      const total =
+
+        item.workflow_type === "onboarding"
+
+          ? (item.tasks || []).length
+
+          : 1;
+ 
+      if (existing) {
+
+        existing.workflow_types.push(item.workflow_type);
+
+        existing.pendingCount += pending;
+
+        existing.totalCount += total;
+
+      } else {
+
+        map.set(item.employee_id, {
+
+          employee_id: item.employee_id,
+
+          employee_name: item.employee_name,
+
+          department: item.department,
+
+          role: item.role,
+
+          experience_level: item.experience_level,
+
+          workflow_types: [item.workflow_type],
+
+          pendingCount: pending,
+
+          totalCount: total,
+
+          overallStatus: "pending",
+
+        });
+
+      }
+
+    });
+ 
+    return Array.from(map.values()).map((e) => ({
+
+      ...e,
+
+      overallStatus: e.pendingCount > 0 ? "pending" : "approved",
+
+    }));
+
+  }, [items]);
+ 
+  const departments = useMemo(() => {
+
+    const unique = Array.from(new Set(employees.map((e) => e.department).filter(Boolean)));
+
+    return unique.sort();
+
+  }, [employees]);
+ 
+  const filtered = useMemo(() => {
+
+    const q = search.trim().toLowerCase();
+
+    return employees.filter((e) => {
+
+      const matchesDept = department === "all" || e.department === department;
+
+      const matchesSearch =
+
+        !q ||
+
+        [e.employee_name, e.employee_id, e.department, e.role, e.experience_level]
+
+          .filter(Boolean)
+
+          .some((v) => String(v).toLowerCase().includes(q));
+
+      return matchesDept && matchesSearch;
+
+    });
+
+  }, [employees, search, department]);
+ 
   return (
-    <Sidebar>
-      <main style={{ padding: 32, flex: 1, maxWidth: 800 }}>
-        <h1>Approval Dashboard</h1>
-        <p style={{ color: "#666", fontSize: 13 }}>
-          Showing items for your role: <strong>{role}</strong> — AI suggests, you decide (and can change selections before approving).
-        </p>
+<Sidebar>
+<div className="bg-[#FAFAF9] min-h-screen w-full p-6 flex-1">
 
-        {loading && <p>Loading...</p>}
-        {!loading && items.length === 0 && <p>Nothing pending for {role}.</p>}
+        {/* Header */}
+<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+<div>
+<p className="uppercase tracking-[0.25em] text-xs text-[#D9A653]">
 
-        {!loading && items.map((item) => (
-          <div key={`${item.employee_id}-${item.workflow_type}`} style={{ border: "1px solid #eee", borderRadius: 8, padding: 16, marginBottom: 16 }}>
-            <div style={{ fontWeight: 600 }}>{item.employee_name}</div>
-            <div style={{ fontSize: 13, color: "#666" }}>
-              {item.department} · {item.role || "Unclassified"}
-              {item.experience_level && ` · ${item.experience_level}`} · {item.workflow_type}
-            </div>
+              People Operations
+</p>
+<h2 className="mt-2 text-4xl font-bold text-[#14213D]">
 
-            {item.tasks.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                {item.tasks.map((t: any, idx: number) => (
-                  <TaskCard key={idx} employeeId={item.employee_id} task={t} workflow={item.workflow_type} onChanged={load} />
+              Approval Dashboard
+</h2>
+<p className="mt-2 text-gray-500">
+
+              Showing items for your role: <strong className="text-[#14213D]">{role}</strong>. Select View to approve or reject individual tasks.
+</p>
+</div>
+</div>
+ 
+        {/* Search */}
+<div className="mt-8 w-full">
+<div className="flex items-center gap-4 mb-5">
+<div className="relative w-full">
+<Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+<input
+
+                value={search}
+
+                onChange={(e) => setSearch(e.target.value)}
+
+                placeholder="Search employees..."
+
+                className="w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 py-3 outline-none focus:ring-2 focus:ring-[#D9A653] focus:border-transparent"
+
+              />
+</div>
+ 
+            <select
+
+              value={department}
+
+              onChange={(e) => setDepartment(e.target.value)}
+
+              className="shrink-0 w-48 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-[#D9A653] focus:border-transparent"
+>
+<option value="all">All departments</option>
+
+              {departments.map((d) => (
+<option key={d} value={d}>{d}</option>
+
+              ))}
+</select>
+ 
+            <div className="whitespace-nowrap rounded-full bg-[#D9A653]/10 px-4 py-2.5 text-sm font-medium text-[#14213D]">
+
+              {filtered.length} Employee{filtered.length === 1 ? "" : "s"}
+</div>
+</div>
+ 
+          {/* Table */}
+<div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+<table className="w-full table-fixed">
+<thead className="bg-[#F4F1EC] border-b border-gray-200">
+<tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+<th className="p-3 w-[24%]">Employee</th>
+<th className="p-3 w-[14%]">Department</th>
+<th className="p-3 w-[16%]">Workflow</th>
+<th className="p-3 w-[14%]">Experience</th>
+<th className="p-3 w-[14%]">Pending Tasks</th>
+<th className="p-3 w-[10%]">Status</th>
+<th className="p-3 w-[8%]">Profile</th>
+</tr>
+</thead>
+ 
+              <tbody>
+
+                {loading && (
+<tr>
+<td colSpan={7} className="p-10 text-center text-gray-500">
+
+                      Loading...
+</td>
+</tr>
+
+                )}
+ 
+                {!loading && filtered.map((e, idx) => (
+<tr
+
+                    key={e.employee_id}
+
+                    className={`border-t border-gray-100 hover:bg-gray-50 transition ${
+
+                      idx % 2 === 1 ? "bg-gray-50/50" : ""
+
+                    }`}
+>
+<td className="p-3 py-3.5 align-top">
+<div className="flex items-center gap-2">
+<div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#14213D] text-white text-xs font-bold shrink-0">
+
+                          {initials(e.employee_name)}
+</div>
+<div className="min-w-0">
+<div className="font-semibold text-[#14213D] truncate">
+
+                            {e.employee_name}
+</div>
+</div>
+</div>
+</td>
+ 
+                    <td className="p-3 py-3.5 align-top truncate">{e.department}</td>
+ 
+                    <td className="p-3 py-3.5 align-top text-xs text-gray-600 capitalize">
+
+                      {e.workflow_types.join(", ")}
+</td>
+ 
+                    <td className="p-3 py-3.5 align-top">
+
+                      {e.experience_level ? (
+<span
+
+                          className={`rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
+
+                            e.experience_level.toLowerCase() === "fresher"
+
+                              ? "bg-sky-100 text-sky-700"
+
+                              : "bg-violet-100 text-violet-700"
+
+                          }`}
+>
+
+                          {e.experience_level.toLowerCase()}
+</span>
+
+                      ) : (
+
+                        "—"
+
+                      )}
+</td>
+ 
+                    <td className="p-3 py-3.5 align-top text-sm text-gray-700">
+
+                      {e.pendingCount} / {e.totalCount}
+</td>
+ 
+                    <td className="p-3 py-3.5 align-top">
+<span
+
+                        className={`inline-block rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
+
+                          STATUS_STYLES[e.overallStatus]
+
+                        }`}
+>
+
+                        {e.overallStatus === "pending" ? "Pending" : "Cleared"}
+</span>
+</td>
+ 
+                    <td className="p-3 py-3.5 align-top">
+<button
+
+                        onClick={() => router.push(`/approvals/${e.employee_id}`)}
+
+                        className="rounded-lg bg-[#14213D] px-3 py-1.5 text-xs text-white hover:bg-[#243654] transition"
+>
+
+                        View
+</button>
+</td>
+</tr>
+
                 ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </main>
-    </Sidebar>
+ 
+                {!loading && filtered.length === 0 && (
+<tr>
+<td colSpan={7} className="p-10 text-center text-gray-500">
+
+                      No approvals found.
+</td>
+</tr>
+
+                )}
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</Sidebar>
+
   );
+
 }
+ 
