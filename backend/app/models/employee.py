@@ -3,7 +3,7 @@ Core SQLAlchemy models. Matches the schema in POC_Technical_Architecture.md sect
 """
 import datetime
 import uuid
-from sqlalchemy import Column, String, DateTime, Float, ForeignKey, Text, Boolean
+from sqlalchemy import Column, String, DateTime, Float, ForeignKey, Text, Boolean, Integer
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -333,3 +333,18 @@ class ReceivedAttachment(Base):
     original_filename = Column(String, nullable=True)
     matched_document_name = Column(String, nullable=True)
     received_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class SoftwareLicense(Base):
+    """Tracks seat allocation per application/license. Seeded from
+    config_data/licenses.json at first use (see services/license_manager.py).
+    Seats decrement only when an Assign Applications task is APPROVED,
+    not when AI merely recommends it -- matches the project-wide rule
+    that nothing counts as real until a human approves it."""
+    __tablename__ = "software_licenses"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    name = Column(String, nullable=False, unique=True)
+    total_seats = Column(Integer, nullable=False)
+    allocated_seats = Column(Integer, default=0)
+    threshold = Column(Integer, default=5)
+    last_alert_sent_at = Column(DateTime, nullable=True)

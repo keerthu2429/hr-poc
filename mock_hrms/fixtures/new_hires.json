@@ -10,20 +10,20 @@
     "location": "New York",
     "manager_name": "David Klein",
     "start_date": "2026-07-10",
-    "ssn_number":"412-58-7734",
+    "ssn_number": "412-58-7734",
     "documents_submitted": [
       "Government ID Proof",
       "Bank Details",
       "Address Proof",
       "Educational Certificates",
       "Previous Employment Relieving Letter"
-         ],
+    ],
     "documents_files": [
-    "../mock_employee_docs/EMP-1001/Michael_Turner_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1001/Michael_Turner_Resume.pdf",
-    "../mock_employee_docs/EMP-1001/Michael_Turner_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1001/Michael_Turner_SSN_Scanned.pdf"
-],
+      "../mock_employee_docs/EMP-1001/Michael_Turner_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1001/Michael_Turner_Resume.pdf",
+      "../mock_employee_docs/EMP-1001/Michael_Turner_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1001/Michael_Turner_SSN_Scanned.pdf"
+    ],
     "synced": true
   },
   {
@@ -34,7 +34,7 @@
     "job_title": "Financial Analyst",
     "role": "Finance",
     "years_of_experience": 1,
-    "ssn_number":"556-21-9043",
+    "ssn_number": "556-21-9043",
     "location": "Chennai",
     "manager_name": "Priya Nair",
     "start_date": "2026-07-08",
@@ -45,11 +45,12 @@
       "Educational Certificates",
       "Previous Employment Relieving Letter"
     ],
-    "documents_files":["../mock_employee_docs/EMP-1002/Rachel_Bennett_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1002/Rachel_Bennett_Resume.pdf",
-    "../mock_employee_docs/EMP-1002/Rachel_Bennett_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1002/Rachel_Bennett_SSN_Scanned.pdf"
-  ],
+    "documents_files": [
+      "../mock_employee_docs/EMP-1002/Rachel_Bennett_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1002/Rachel_Bennett_Resume.pdf",
+      "../mock_employee_docs/EMP-1002/Rachel_Bennett_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1002/Rachel_Bennett_SSN_Scanned.pdf"
+    ],
     "synced": true
   },
   {
@@ -60,18 +61,18 @@
     "job_title": "IT Administrator",
     "role": "IT Administrator",
     "years_of_experience": 4,
-    "ssn_number":"298-63-1157",
+    "ssn_number": "298-63-1157",
     "location": "Bengaluru",
     "manager_name": "Divya Rao",
     "start_date": "2026-07-09",
     "documents_submitted": [],
     "documents_files": [
-    "../mock_employee_docs/EMP-1003/David_Coleman_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1003/David_Coleman_Resume.pdf",
-    "../mock_employee_docs/EMP-1003/David_Coleman_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1003/David_Coleman_SSN_Scanned.pdf",
-    "../mock_employee_docs/EMP-1003/David_Coleman_RelievingLetter.pdf"
-],
+      "../mock_employee_docs/EMP-1003/David_Coleman_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1003/David_Coleman_Resume.pdf",
+      "../mock_employee_docs/EMP-1003/David_Coleman_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1003/David_Coleman_SSN_Scanned.pdf",
+      "../mock_employee_docs/EMP-1003/David_Coleman_RelievingLetter.pdf"
+    ],
     "synced": true
   },
   {
@@ -82,7 +83,7 @@
     "job_title": "Marketing Coordinator",
     "location": "Mumbai",
     "manager_name": "Arjun Kapoor",
-    "ssn_number":"674-30-2298",
+    "ssn_number": "674-30-2298",
     "start_date": "2026-07-11",
     "documents_submitted": [
       "Government ID Proof",
@@ -92,12 +93,12 @@
       "Bank Account Details"
     ],
     "documents_files": [
-    "../mock_employee_docs/EMP-1004/Jessica_Palmer_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1004/Jessica_Palmer_Resume.pdf",
-    "../mock_employee_docs/EMP-1004/Jessica_Palmer_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1004/Jessica_Palmer_SSN_Scanned.pdf",
-    "../mock_employee_docs/EMP-1004/Jessica_Palmer_RelievingLetter.pdf"
-],
+      "../mock_employee_docs/EMP-1004/Jessica_Palmer_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1004/Jessica_Palmer_Resume.pdf",
+      "../mock_employee_docs/EMP-1004/Jessica_Palmer_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1004/Jessica_Palmer_SSN_Scanned.pdf",
+      "../mock_employee_docs/EMP-1004/Jessica_Palmer_RelievingLetter.pdf"
+    ],
     "synced": true
   },
   {
@@ -108,7 +109,7 @@
     "job_title": "Legal Intern",
     "role": "InvalidRoleXYZ",
     "years_of_experience": 0,
-    "ssn_number":"349-87-6612",
+    "ssn_number": "349-87-6612",
     "location": "Chennai",
     "manager_name": "David Klein",
     "start_date": "2026-07-12",
@@ -118,12 +119,12 @@
       "Educational Certificates"
     ],
     "documents_files": [
-    "../mock_employee_docs/EMP-1005/Andrew_Mitchell_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1005/Andrew_Mitchell_Resume.pdf",
-    "../mock_employee_docs/EMP-1005/Andrew_Mitchell_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1005/Andrew_Mitchell_SSN_Scanned.pdf",
-    "../mock_employee_docs/EMP-1005/Andrew_Mitchell_RelievingLetter.pdf"
-],
+      "../mock_employee_docs/EMP-1005/Andrew_Mitchell_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1005/Andrew_Mitchell_Resume.pdf",
+      "../mock_employee_docs/EMP-1005/Andrew_Mitchell_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1005/Andrew_Mitchell_SSN_Scanned.pdf",
+      "../mock_employee_docs/EMP-1005/Andrew_Mitchell_RelievingLetter.pdf"
+    ],
     "synced": true
   },
   {
@@ -134,19 +135,19 @@
     "job_title": "Compliance Officer",
     "role": "Compliance Officer",
     "experience_level": "Experienced",
-    "ssn_number":"781-45-3320",
+    "ssn_number": "781-45-3320",
     "years_of_experience": 5,
     "location": "New York",
     "manager_name": "Priya Nair",
     "start_date": "2026-07-13",
     "documents_submitted": [],
     "documents_files": [
-    "../mock_employee_docs/EMP-1006/Emily_Sanders_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1006/Emily_Sanders_Resume.pdf",
-    "../mock_employee_docs/EMP-1006/Emily_Sanders_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1006/Emily_Sanders_SSN_Scanned.pdf",
-    "../mock_employee_docs/EMP-1006/Emily_Sanders_RelievingLetter.pdf"
-],
+      "../mock_employee_docs/EMP-1006/Emily_Sanders_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1006/Emily_Sanders_Resume.pdf",
+      "../mock_employee_docs/EMP-1006/Emily_Sanders_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1006/Emily_Sanders_SSN_Scanned.pdf",
+      "../mock_employee_docs/EMP-1006/Emily_Sanders_RelievingLetter.pdf"
+    ],
     "synced": true
   },
   {
@@ -158,18 +159,18 @@
     "role": "Compliance Officer",
     "experience_level": "Experienced",
     "years_of_experience": 5,
-    "ssn_number":"12-34-56789",
+    "ssn_number": "12-34-56789",
     "location": "New York",
     "manager_name": "Priya Nair",
     "start_date": "2026-07-14",
     "documents_submitted": [],
     "documents_files": [
-    "../mock_employee_docs/EMP-1007/Christopher_Hayes_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1007/Christopher_Hayes_Resume.pdf",
-    "../mock_employee_docs/EMP-1007/Christopher_Hayes_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1007/Christopher_Hayes_SSN_Scanned.pdf",
-    "../mock_employee_docs/EMP-1007/Christopher_Hayes_RelievingLetter.pdf"
-],
+      "../mock_employee_docs/EMP-1007/Christopher_Hayes_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1007/Christopher_Hayes_Resume.pdf",
+      "../mock_employee_docs/EMP-1007/Christopher_Hayes_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1007/Christopher_Hayes_SSN_Scanned.pdf",
+      "../mock_employee_docs/EMP-1007/Christopher_Hayes_RelievingLetter.pdf"
+    ],
     "synced": true
   },
   {
@@ -181,17 +182,17 @@
     "role": "Compliance Officer",
     "experience_level": "fresher",
     "years_of_experience": 0,
-    "ssn_number":"823-19-4405",
+    "ssn_number": "823-19-4405",
     "location": "New York",
     "manager_name": "Priya Nair",
     "start_date": "2026-07-15",
     "documents_submitted": [],
     "documents_files": [
-    "../mock_employee_docs/EMP-1008/Olivia_Foster_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1008/Olivia_Foster_Resume.pdf",
-    "../mock_employee_docs/EMP-1008/Olivia_Foster_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1008/Olivia_Foster_SSN_Scanned.pdf"
-],
+      "../mock_employee_docs/EMP-1008/Olivia_Foster_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1008/Olivia_Foster_Resume.pdf",
+      "../mock_employee_docs/EMP-1008/Olivia_Foster_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1008/Olivia_Foster_SSN_Scanned.pdf"
+    ],
     "synced": true
   },
   {
@@ -203,17 +204,17 @@
     "role": "Compliance Officer",
     "experience_level": "fresher",
     "years_of_experience": 0,
-    "ssn_number":"467-52-8801",
+    "ssn_number": "467-52-8801",
     "location": "New York",
     "manager_name": "Priya Nair",
     "start_date": "2026-07-16",
     "documents_submitted": [],
     "documents_files": [
-    "../mock_employee_docs/EMP-1009/Brandon_Walsh_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1009/Brandon_Walsh_Resume.pdf",
-    "../mock_employee_docs/EMP-1009/Brandon_Walsh_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1009/Brandon_Walsh_SSN_Scanned.pdf"
-],
+      "../mock_employee_docs/EMP-1009/Brandon_Walsh_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1009/Brandon_Walsh_Resume.pdf",
+      "../mock_employee_docs/EMP-1009/Brandon_Walsh_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1009/Brandon_Walsh_SSN_Scanned.pdf"
+    ],
     "synced": true
   },
   {
@@ -225,22 +226,17 @@
     "role": "Compliance Officer",
     "experience_level": "fresher",
     "years_of_experience": 0,
-    "ssn_number":"590-27-6613",
+    "ssn_number": "590-27-6613",
     "location": "New York",
     "manager_name": "Priya Nair",
     "start_date": "2026-07-17",
     "documents_submitted": [],
     "documents_files": [
-    "../mock_employee_docs/EMP-1010/Natalie_Reyes_OfferLetter.pdf",
-    "../mock_employee_docs/EMP-1010/Natalie_Reyes_Resume.pdf",
-    "../mock_employee_docs/EMP-1010/Natalie_Reyes_BankDetails.pdf",
-    "../mock_employee_docs/EMP-1010/Natalie_Reyes_SSN_Scanned.pdf"
-],
+      "../mock_employee_docs/EMP-1010/Natalie_Reyes_OfferLetter.pdf",
+      "../mock_employee_docs/EMP-1010/Natalie_Reyes_Resume.pdf",
+      "../mock_employee_docs/EMP-1010/Natalie_Reyes_BankDetails.pdf",
+      "../mock_employee_docs/EMP-1010/Natalie_Reyes_SSN_Scanned.pdf"
+    ],
     "synced": true
   }
-
-
-
-
 ]
- 

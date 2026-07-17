@@ -1,0 +1,12 @@
+[
+  {"name": "Outlook", "total_seats": 60, "threshold": 5},
+  {"name": "Teams", "total_seats": 60, "threshold": 5},
+  {"name": "SharePoint", "total_seats": 60, "threshold": 5},
+  {"name": "OneDrive", "total_seats": 60, "threshold": 5},
+  {"name": "iManage", "total_seats": 20, "threshold": 3},
+  {"name": "Intapp", "total_seats": 15, "threshold": 2},
+  {"name": "Time Entry System", "total_seats": 40, "threshold": 5},
+  {"name": "Billing System", "total_seats": 20, "threshold": 3},
+  {"name": "HR Portal", "total_seats": 20, "threshold": 3},
+  {"name": "ERP", "total_seats": 25, "threshold": 3}
+]

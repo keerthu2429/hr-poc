@@ -84,3 +84,6 @@ def get_all_project_names() -> list[str]:
 
 def get_document_keywords() -> dict:
     return _load("documents_keywords.json")
+
+def get_licenses() -> list:
+    return _load("licenses.json")

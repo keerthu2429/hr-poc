@@ -33,6 +33,7 @@ from app.routers import (
     profile,
     insights,
     hr_assistant,   # <-- NEW
+    licenses,
 )
 
 app = FastAPI(title="Onboarding/Offboarding POC API")
@@ -59,6 +60,7 @@ app.include_router(profile.router)
 app.include_router(insights.router)
 app.include_router(decisions.router)
 app.include_router(compliance.router)
+app.include_router(licenses.router)
 
 # HR Assistant Router
 app.include_router(hr_assistant.router)

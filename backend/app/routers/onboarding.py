@@ -1,9 +1,11 @@
+from pydantic import json_schema
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import datetime
 import os
 import re
+import json
 from app import email_client
 from app.config import get_document_keywords
 from app.database import get_db
@@ -11,6 +13,7 @@ from app.models import OnboardingTracker, Employee, EmployeeDocument, Onboarding
 from app.schemas.employee import TaskDecision, TaskSelectionUpdate, EmailDraftUpdate
 from app.orchestrators.onboarding_orchestrator import run_onboarding, resume_after_documents, create_document_review_task, resume_after_documents, _draft_and_queue_missing_document_email
 from app.services.track_status import get_all_track_statuses, recompute_employee_status
+from app.services.license_manager import allocate_seats
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -153,6 +156,12 @@ def decide_task(employee_id: str, task_id: str, payload: TaskDecision, db: Sessi
     task.status = payload.status
     task.decided_at = datetime.datetime.utcnow()
     db.commit()
+    
+    # --- NEW: seat allocation when applications assigned ---
+    if task.task_name == "Assign Applications" and payload.status == "approved":
+        app_names = json.loads(task.selected_options) if task.selected_options else []
+        if app_names:
+            allocate_seats(db, app_names)
 
     if task.task_type == "email_draft" and payload.status == "approved":
         email_record = (
