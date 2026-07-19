@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "../../lib/useAuth";
+import { getToken } from "../../lib/api";
 import Sidebar from "../components/Sidebar";
 
 /* ============================================================
@@ -53,9 +54,14 @@ async function askAssistant(
   question: string,
   conversationId: string | null
 ): Promise<{ conversation_id: string; answer: string; sources: ChatSource[] }> {
+  const token = getToken();
+
   const res = await fetch(`${HR_ASSISTANT_BASE_URL}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       employee_id: employeeId,
       question,
@@ -64,7 +70,19 @@ async function askAssistant(
   });
 
   if (!res.ok) {
-    throw new Error(`HR Assistant request failed (${res.status})`);
+    // Surface the real reason instead of a generic network-failure message —
+    // a 401 (missing/expired token) and a 500 (backend error) need different
+    // fixes, and both used to look identical to the user.
+    let detail = "";
+    try {
+      const body = await res.json();
+      detail = body?.detail || body?.message || "";
+    } catch {
+      // response wasn't JSON — ignore, we still have res.status
+    }
+    throw new Error(
+      detail || `HR Assistant request failed (${res.status} ${res.statusText})`
+    );
   }
 
   return res.json();
@@ -257,6 +275,11 @@ export default function HrAssistantPage() {
 
     if (!ready) {
       setError("HR Assistant is still loading. Please wait...");
+    // Without an employee id the backend has nothing to scope the answer
+    // to — fail fast with a clear message instead of sending "" and
+    // getting back a confusing 400/422 from the API.
+    if (!employeeId) {
+      setError("You need to be signed in to use the HR Assistant.");
       return;
     }
 
@@ -273,7 +296,7 @@ export default function HrAssistantPage() {
         { role: "assistant", content: data.answer, sources: data.sources },
       ]);
     } catch (err) {
-      setError("Couldn't reach the HR Assistant. Try again.");
+      setError(err instanceof Error ? err.message : "Couldn't reach the HR Assistant. Try again.");
     } finally {
       setLoading(false);
     }

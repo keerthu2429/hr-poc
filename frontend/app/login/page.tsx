@@ -3,32 +3,120 @@
 import { useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import { Fraunces } from "next/font/google";
 import { api, setToken } from "../../lib/api";
 import { useAuth } from "../../lib/useAuth";
+
+// Display serif for the wordmark + stage numerals — swap Inter/system-sans
+// out for something with more personality on the brand panel only.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["300", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+});
 
 // ==========================
 // Lifecycle motif
 // ==========================
+// Was a static 01/02 stack. Replaced with a literal "lifecycle rail":
+// a vertical line with pulses that travel along it, since the product's
+// whole pitch is a continuous lifecycle, not a two-item list.
 
-const STAGES = ["Onboarding","Offboarding"];
+const STAGES = [
+  {
+    label: "Onboarding",
+    note: "Every new hire moves from signed offer to a confident first day, automatically.",
+  },
+  {
+    label: "Offboarding",
+    note: "When someone leaves, access, assets, and paperwork are wrapped up cleanly.",
+  },
+];
 
-function LifecycleStack() {
+function LifecycleRail() {
   return (
-    <div className="border-t border-white/15">
-      {STAGES.map((label, i) => (
-        <div
-          key={label}
-          className="flex items-center gap-6 py-5 border-b border-white/15"
+    <div className="relative mt-12 max-w-sm">
+      {/* the rail — gold where it leaves Onboarding, teal where it
+          arrives at Offboarding, with a chevron marking the handoff
+          so the line reads as "flows into", not just a divider */}
+      <div className="absolute left-[13px] top-[14px] bottom-[14px] w-px bg-gradient-to-b from-[#D9A653] via-[#D9A653]/40 to-[#4FD1C5]">
+        <span className="lifecycle-pulse" style={{ animationDelay: "0s" }} />
+        <span className="lifecycle-pulse" style={{ animationDelay: "1.5s" }} />
+        <span className="lifecycle-pulse" style={{ animationDelay: "3s" }} />
+
+        <svg
+          viewBox="0 0 12 12"
+          className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 text-white/30"
+          fill="none"
         >
-          <span className="text-2xl font-semibold text-[#D9A653]">
+          <path
+            d="M2 4l4 4 4-4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+
+      {STAGES.map((stage, i) => (
+        <div key={stage.label} className="relative flex items-start gap-5 py-4">
+          <span
+            className={`${fraunces.className} relative z-[1] flex h-7 w-7 flex-none items-center justify-center rounded-full border text-xs
+              ${i === 0
+                ? "border-[#D9A653] text-[#D9A653]"
+                : "border-[#4FD1C5] text-[#4FD1C5]"}
+              bg-[#0F1B31]`}
+          >
             0{i + 1}
           </span>
 
-          <span className="text-2xl font-semibold text-[#F7F5F0]">
-            {label}
-          </span>
+          <div>
+            <p className="text-[17px] font-semibold text-[#F7F5F0]">
+              {stage.label}
+            </p>
+            <p className="text-[13.5px] leading-snug text-white/50">
+              {stage.note}
+            </p>
+          </div>
         </div>
       ))}
+
+      <style jsx>{`
+        .lifecycle-pulse {
+          position: absolute;
+          left: -1.5px;
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: #4fd1c5;
+          box-shadow: 0 0 8px 2px rgba(79, 209, 197, 0.7);
+          animation: travel 4.5s linear infinite;
+        }
+        @keyframes travel {
+          0% {
+            top: 0%;
+            opacity: 0;
+          }
+          8% {
+            opacity: 1;
+          }
+          92% {
+            opacity: 1;
+          }
+          100% {
+            top: 100%;
+            opacity: 0;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .lifecycle-pulse {
+            animation: none;
+            opacity: 0.6;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -109,27 +197,37 @@ export default function LoginPage() {
     <div className="min-h-screen flex bg-[#FAFAF9]">
       {/* Left */}
 
-      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-center bg-[#14213D] p-20">
-        <span className="absolute -right-10 -top-16 text-[320px] text-white/5 font-bold">
-          4
-        </span>
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-center overflow-hidden bg-[#0B1220] p-20">
+        {/* ambient glow, replaces the flat oversized "4" watermark */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(60% 50% at 15% 0%, rgba(79,209,197,0.16), transparent 60%), radial-gradient(70% 60% at 100% 100%, rgba(217,166,83,0.14), transparent 60%)",
+          }}
+        />
 
-        <div className="absolute top-0 left-0 h-2 w-24 bg-[#D9A653]" />
+        <div className="absolute top-0 left-0 h-[3px] w-full bg-gradient-to-r from-[#D9A653] via-[#D9A653] to-transparent" />
 
-        <p className="text-[#D9A653] uppercase tracking-[0.25em] text-xs">
+        <p className="relative text-[#D9A653] uppercase tracking-[0.25em] text-xs">
           People Operations Platform
         </p>
 
-        <h1 className="text-6xl font-bold text-white mt-3">
-          AI Employee Lifecycle Management Platform
+        <h1
+          className={`${fraunces.className} relative text-5xl leading-[1.1] font-medium text-white mt-3 tracking-tight max-w-md`}
+        >
+          Vantaracg{" "}
+          <em className="text-[#4FD1C5] font-light not-italic italic">
+            HR Agent
+          </em>
         </h1>
 
-        <p className="text-gray-300 mt-5 max-w-sm">
+        <p className="relative text-gray-300 mt-5 max-w-sm">
           One system for every stage of the employee lifecycle.
         </p>
 
-        <div className="mt-12">
-          <LifecycleStack />
+        <div className="relative">
+          <LifecycleRail />
         </div>
       </div>
 
