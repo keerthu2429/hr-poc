@@ -58,6 +58,14 @@ function ApprovalsIcon({ className }: { className?: string }) {
   );
 }
 
+function ReportsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3h18v18H3z" />
+      <path d="M7 14h3v4H7zM11 10h3v8h-3zM15 6h3v12h-3z" />
+    </svg>
+    );
+}
 function TrainingIcon({ className }: { className?: string }) {   // ← ADD THIS
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -104,6 +112,7 @@ const menuBeforeAssistant = [
   { href: "/onboarding-tracker", label: "Onboarding Tracker", icon: OnboardingIcon },
   { href: "/offboarding-tracker", label: "Offboarding Tracker", icon: OffboardingIcon },
   { href: "/approvals", label: "Approval Dashboard", icon: ApprovalsIcon },
+  { href: "/reports", label: "Reports", icon: ReportsIcon},
   { href: "/training", label: "Training & Learning", icon: TrainingIcon },
   { href: "/ai-insights", label: "AI Insights", icon: AiIcon },
 ];
@@ -206,11 +215,14 @@ export default function Sidebar({
           )}
         </div>
 
-        {/* Navigation */}
+        {/* Navigation — scrolls if it overflows, but the scrollbar itself
+            is hidden (no-scrollbar) so it doesn't sit on top of the nav
+            items and push a visible track/arrows into the panel. */}
         <nav
           className={`
             flex-1
             overflow-y-auto
+            no-scrollbar
             py-4
             ${collapsed ? "px-2" : "px-3"}
           `}
@@ -276,6 +288,16 @@ export default function Sidebar({
       >
         {children}
       </main>
+
+      <style jsx global>{`
+        .no-scrollbar {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE / old Edge */
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, new Edge */
+        }
+      `}</style>
 
     </div>
   );

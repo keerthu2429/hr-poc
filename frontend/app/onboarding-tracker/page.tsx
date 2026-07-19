@@ -177,7 +177,8 @@ export default function OnboardingTrackerDirectoryPage() {
 
   return (
     <Sidebar>
-      <main style={{ padding: 32, flex: 1, maxWidth: 1160, background: "#fdfcfa" }}>
+      {/* --- FIXED: Increased maxWidth from 1160 to 1400 for wider content --- */}
+      <main style={{ padding: 32, flex: 1, maxWidth: 1400, width: "100%", background: "#fdfcfa" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.5, color: "#d97706", textTransform: "uppercase" }}>

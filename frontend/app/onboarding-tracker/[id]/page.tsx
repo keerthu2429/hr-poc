@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/useAuth";
@@ -28,6 +28,9 @@ const TASK_STATUS_LABEL: Record<string, string> = {
 const TRACK_STATUS_COLOR: Record<string, string> = {
   completed: "#16a34a", in_progress: "#ea580c", blocked: "#dc2626", not_started: "#9ca3af",
 };
+const TRACK_STATUS_BG: Record<string, string> = {
+  completed: "#dcfce7", in_progress: "#ffedd5", blocked: "#fee2e2", not_started: "#f1f5f9",
+};
 
 // Security Track removed; Manager Track relabeled as Delivery Track (still maps
 // to the "Manager" key from the API/tasksByTrack data — update if your backend
@@ -35,6 +38,15 @@ const TRACK_STATUS_COLOR: Record<string, string> = {
 const TRACK_STEPS = ["HR Track", "IT Track", "Delivery Track"];
 const STEP_TO_TRACK: Record<string, string> = {
   "HR Track": "HR", "IT Track": "IT", "Delivery Track": "Manager",
+};
+// Icon shown per step node. Plain inline SVG paths — no external icon
+// library required. Swap for lucide-react etc. if already installed.
+const STEP_ICON: Record<string, React.ReactNode> = {
+  "Registered": <path d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+  "Validation": <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+  "HR Track": <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />,
+  "IT Track": <path d="M4 16V6a2 2 0 012-2h12a2 2 0 012 2v10m-16 0h16m-16 0l-2 4h20l-2-4" />,
+  "Delivery Track": <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7zM6.5 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17.5 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />,
 };
 
 const POLL_INTERVAL_MS = 3000;
@@ -45,6 +57,16 @@ function formatTime(ts: string) {
 
 function getEmployeeCode(e: any): string {
   return e.employeeId ?? e.employee_id ?? e.empId ?? e.emp_id ?? e.employeeCode ?? e.employee_code ?? e.code ?? e.id ?? "—";
+}
+
+function StepIcon({ step, color, size = 18 }: { step: string; color: string; size?: number }) {
+  const path = STEP_ICON[step];
+  if (!path) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      {path}
+    </svg>
+  );
 }
 
 export default function OnboardingTrackerDetailPage() {
@@ -115,8 +137,7 @@ export default function OnboardingTrackerDetailPage() {
     (step) => latestByStep.get(step) || { step, status: "waiting" }
   );
 
-  // Default the selected step to the first non-completed one (i.e. "where things are at"),
-  // falling back to the last step if everything is done.
+  // Default the selected step to the first non-completed one
   useEffect(() => {
     if (selectedStep || orderedSteps.length === 0) return;
     const current = orderedSteps.find((s) => s.status !== "completed") || orderedSteps[orderedSteps.length - 1];
@@ -140,13 +161,17 @@ export default function OnboardingTrackerDetailPage() {
     ? auditLog.filter((a: any) => a.agent === "Validation Agent")
     : [];
 
-  // Badge color: if this is a track step that's still live in_progress (or blocked / not_started),
-  // color the badge by that live track status instead of the raw step status (which may say
-  // "completed" from the last snapshot while the live track is actually still running).
+  // Badge color logic
   const badgeColor =
     activeIsTrackStep && activeLiveTrackStatus
       ? TRACK_STATUS_COLOR[activeLiveTrackStatus] || "#475569"
       : STATUS_COLOR[activeStep?.status] || "#475569";
+  const badgeBg =
+    activeIsTrackStep && activeLiveTrackStatus
+      ? TRACK_STATUS_BG[activeLiveTrackStatus] || "#f1f5f9"
+      : `${badgeColor}1a`;
+
+  const completedCount = orderedSteps.filter((s) => s.status === "completed").length;
 
   return (
     <Sidebar collapsed>
@@ -156,16 +181,11 @@ export default function OnboardingTrackerDetailPage() {
           70% { box-shadow: 0 0 0 10px rgba(217,119,6,0); }
           100% { box-shadow: 0 0 0 0 rgba(217,119,6,0); }
         }
-        @keyframes pulseRingOrange {
-          0% { box-shadow: 0 0 0 0 rgba(234,88,12,0.35); }
-          70% { box-shadow: 0 0 0 10px rgba(234,88,12,0); }
-          100% { box-shadow: 0 0 0 0 rgba(234,88,12,0); }
-        }
         .tracker-node { transition: transform 0.15s ease; }
         .tracker-node:hover { transform: translateY(-2px); }
       `}</style>
 
-      <main style={{ padding: "28px 40px 60px", maxWidth: 1000, margin: "0 auto" }}>
+      <main style={{ padding: "28px 40px 60px", width: "100%", background: "#fdfcfa" }}>
         <button
           onClick={() => router.push("/onboarding-tracker")}
           style={{
@@ -181,28 +201,54 @@ export default function OnboardingTrackerDetailPage() {
           ← Back to Onboarding Tracker
         </button>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1.5, color: "#d97706", textTransform: "uppercase" }}>
-              People Operations
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "#fef3c7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 20,
+                fontWeight: 700,
+                color: "#d97706",
+                flexShrink: 0,
+              }}
+            >
+              {employee?.name ? employee.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("") : "?"}
             </div>
-            <h1 style={{ margin: "6px 0 4px", fontSize: 32, fontWeight: 800, color: "#0f172a", letterSpacing: -0.5 }}>
-              {employee ? employee.name : "Onboarding Tracker"}
-            </h1>
-            {employee && (
-              <p style={{ fontSize: 15, color: "#475569", fontWeight: 600, marginTop: 2 }}>
-                {getEmployeeCode(employee)} — {employee.department}
-              </p>
-            )}
+            <div>
+              <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#0f172a", letterSpacing: -0.3 }}>
+                {employee ? employee.name : "Onboarding Tracker"}
+              </h1>
+              {employee && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#475569", background: "#f1f5f9", padding: "3px 10px", borderRadius: 999 }}>
+                    {getEmployeeCode(employee)}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#475569", background: "#f1f5f9", padding: "3px 10px", borderRadius: 999 }}>
+                    {employee.department}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
+          {!loading && orderedSteps.length > 0 && (
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#166534", background: "#dcfce7", padding: "5px 12px", borderRadius: 999, flexShrink: 0 }}>
+              {completedCount} of {orderedSteps.length} stages complete
+            </span>
+          )}
         </div>
-        <p style={{ fontSize: 14.5, color: "#64748b", fontWeight: 500, marginTop: 4, marginBottom: 28 }}>
+        <p style={{ fontSize: 13.5, color: "#94a3b8", fontWeight: 500, marginTop: -12, marginBottom: 24 }}>
           Task approvals happen in the Approval Dashboard — this screen only displays progress.
         </p>
 
         {loading && <p>Loading...</p>}
 
-        {/* Horizontal tracker */}
+        {/* Horizontal tracker: segmented progress bar + icon stepper */}
         {!loading && orderedSteps.length > 0 && (
           <div
             style={{
@@ -210,10 +256,11 @@ export default function OnboardingTrackerDetailPage() {
               border: "1px solid #eef0f2",
               borderRadius: 16,
               boxShadow: "0 1px 3px rgba(15,23,42,0.06)",
-              padding: "32px 28px 24px",
+              padding: "28px 28px 24px",
               marginBottom: 20,
             }}
           >
+            {/* Icon stepper */}
             <div style={{ display: "flex", alignItems: "flex-start" }}>
               {orderedSteps.map((s, i) => {
                 const isSelected = selectedStep === s.step;
@@ -227,6 +274,10 @@ export default function OnboardingTrackerDetailPage() {
                 const isTrackStepInProgress = isTrackStep && liveTrackStatus === "in_progress";
                 const showAsCompleted = isCompleted && !isTrackStepInProgress;
                 const lineFilled = showAsCompleted;
+                const isCurrent = isSelected && !showAsCompleted && !isWaiting;
+
+                const nodeSize = isCurrent ? 48 : 40;
+                const iconColor = showAsCompleted ? "#fff" : isTrouble ? "#dc2626" : isWaiting ? "#9ca3af" : "#d97706";
 
                 return (
                   <div key={s.step} style={{ display: "flex", alignItems: "center", flex: i < orderedSteps.length - 1 ? 1 : "0 0 auto" }}>
@@ -237,23 +288,25 @@ export default function OnboardingTrackerDetailPage() {
                     >
                       <div
                         style={{
-                          width: 44,
-                          height: 44,
+                          width: nodeSize,
+                          height: nodeSize,
                           borderRadius: "50%",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 18,
-                          fontWeight: 700,
                           background: showAsCompleted ? "#16a34a" : isTrouble ? "#fee2e2" : "#fff",
-                          color: showAsCompleted ? "#fff" : isTrouble ? "#dc2626" : isTrackStepInProgress ? "#ea580c" : isWaiting ? "#9ca3af" : "#d97706",
-                          border: showAsCompleted ? "none" : `2px solid ${isTrouble ? "#dc2626" : isTrackStepInProgress ? "#ea580c" : isWaiting ? "#d1d5db" : "#d97706"}`,
-                          boxShadow: isSelected ? `0 0 0 4px ${showAsCompleted ? "rgba(22,163,74,0.15)" : isTrackStepInProgress ? "rgba(234,88,12,0.15)" : isWaiting ? "rgba(148,163,184,0.15)" : "rgba(217,119,6,0.15)"}` : "none",
-                          animation: isTrackStepInProgress ? "pulseRingOrange 2s infinite" : isRunning ? "pulseRing 2s infinite" : "none",
+                          border: showAsCompleted ? "none" : `2px solid ${isTrouble ? "#dc2626" : isTrackStepInProgress ? "#d97706" : isWaiting ? "#d1d5db" : "#d97706"}`,
+                          boxShadow: isCurrent ? "0 0 0 5px rgba(217,119,6,0.15)" : "none",
+                          animation: isTrackStepInProgress || isRunning ? "pulseRing 2s infinite" : "none",
                           opacity: isWaiting ? 0.7 : 1,
+                          marginTop: isCurrent ? -4 : 0,
                         }}
                       >
-                        {showAsCompleted ? "✓" : isTrouble ? "!" : i + 1}
+                        {isTrouble ? (
+                          <span style={{ fontSize: 18, fontWeight: 700, color: "#dc2626" }}>!</span>
+                        ) : (
+                          <StepIcon step={s.step} color={iconColor} size={isCurrent ? 20 : 18} />
+                        )}
                       </div>
                       <div
                         style={{
@@ -280,7 +333,7 @@ export default function OnboardingTrackerDetailPage() {
                     </div>
 
                     {i < orderedSteps.length - 1 && (
-                      <div style={{ flex: 1, height: 3, borderRadius: 2, background: lineFilled ? "#16a34a" : "#e5e7eb", marginTop: -30 }} />
+                      <div style={{ flex: 1, height: 2, borderRadius: 2, background: lineFilled ? "#16a34a" : "#e5e7eb", marginTop: -30 }} />
                     )}
                   </div>
                 );
@@ -301,13 +354,16 @@ export default function OnboardingTrackerDetailPage() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>{activeStep.step}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {STEP_ICON[activeStep.step] && <StepIcon step={activeStep.step} color="#d97706" size={18} />}
+                <span style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>{activeStep.step}</span>
+              </div>
               <span
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
                   color: badgeColor,
-                  background: `${badgeColor}1a`,
+                  background: badgeBg,
                   padding: "4px 12px",
                   borderRadius: 999,
                 }}
@@ -345,43 +401,76 @@ export default function OnboardingTrackerDetailPage() {
 
             {activeIsTrackStep && (
               <>
-                <div style={{ fontWeight: 600, marginTop: 16, marginBottom: 6, fontSize: 13, color: "#0f172a" }}>{activeStep.step} Tasks</div>
+                <div style={{ fontWeight: 600, marginTop: 16, marginBottom: 10, fontSize: 13, color: "#0f172a" }}>{activeStep.step} Tasks</div>
                 {activeTrackTasks.length === 0 && <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>No tasks yet.</div>}
-                {activeTrackTasks.map((t: any, idx: number) => {
-                  const tColor = TASK_STATUS_COLOR[t.status] || "#0f172a";
-                  const tBg = TASK_STATUS_BG[t.status] || "#f1f5f9";
-                  return (
-                    <div key={idx} style={{ marginBottom: 10, paddingBottom: 8, borderBottom: idx < activeTrackTasks.length - 1 ? "1px solid #f1f1f1" : "none" }}>
-                      <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                        <span>{TASK_STATUS_ICON[t.status]}</span>
-                        <span style={{ color: t.status === "pending" ? "#0f172a" : tColor, fontWeight: t.status === "pending" ? 600 : 500 }}>
-                          {t.task_name}
-                        </span>
-                        {!t.is_mandatory && <span style={{ fontSize: 11, color: "#999" }}>(optional)</span>}
-                        <span
-                          style={{
-                            marginLeft: "auto",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            letterSpacing: 0.3,
-                            textTransform: "uppercase",
-                            color: tColor,
-                            background: tBg,
-                            padding: "2px 9px",
-                            borderRadius: 999,
-                          }}
-                        >
-                          {TASK_STATUS_LABEL[t.status] || t.status}
-                        </span>
-                      </div>
-                      {t.ai_recommendation && (
-                        <div style={{ fontSize: 13, color: "#666", marginTop: 4, fontStyle: "italic" }}>
-                          {t.is_ai_generated ? "🤖 " : ""}{t.ai_recommendation}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {activeTrackTasks.map((t: any, idx: number) => {
+                    const tColor = TASK_STATUS_COLOR[t.status] || "#0f172a";
+                    const tBg = TASK_STATUS_BG[t.status] || "#f1f5f9";
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          border: "1px solid #eef0f2",
+                          borderRadius: 10,
+                          padding: "10px 12px",
+                        }}
+                      >
+                        <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                          <span>{TASK_STATUS_ICON[t.status]}</span>
+                          <span style={{ color: t.status === "pending" ? "#0f172a" : tColor, fontWeight: t.status === "pending" ? 600 : 500 }}>
+                            {t.task_name}
+                          </span>
+                          {!t.is_mandatory && <span style={{ fontSize: 11, color: "#999" }}>(optional)</span>}
+                          <span
+                            style={{
+                              marginLeft: "auto",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              letterSpacing: 0.3,
+                              textTransform: "uppercase",
+                              color: tColor,
+                              background: tBg,
+                              padding: "2px 9px",
+                              borderRadius: 999,
+                            }}
+                          >
+                            {TASK_STATUS_LABEL[t.status] || t.status}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+
+                        {/* AI-generated recommendations shown as a footnote inside the
+                            task card, separated by a hairline divider. */}
+                        {t.ai_recommendation && (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              paddingTop: 8,
+                              borderTop: "1px solid #f1f5f9",
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 6,
+                            }}
+                          >
+                            {t.is_ai_generated && (
+                              <span style={{ fontSize: 13, color: "#6D4FC7", flexShrink: 0, lineHeight: "18px" }} aria-hidden="true">
+                                ✦
+                              </span>
+                            )}
+                            <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.5 }}>
+                              {t.is_ai_generated && (
+                                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase", color: "#6D4FC7", marginRight: 6 }}>
+                                  AI recommended
+                                </span>
+                              )}
+                              <span style={{ fontStyle: "italic" }}>{t.ai_recommendation}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </>
             )}
           </div>
