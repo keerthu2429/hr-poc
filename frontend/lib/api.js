@@ -39,6 +39,7 @@ export const api = {
   login: (email, password) =>
     request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   listEmployees: () => request("/employees"),
+
   getEmployee: (id) => request(`/employees/${id}`),
   getProfile: (id) => request(`/employees/${id}/profile`),
   createEmployee: (payload) =>
@@ -60,6 +61,35 @@ export const api = {
     request(`/onboarding/${id}/tasks/${taskId}/selection`, {
       method: "PATCH", body: JSON.stringify({ selected_options: selectedOptions }),
     }),
+  approvalsForEmployee: async (employeeId) => {
+    const ROLE_TO_GROUP = { HR: "hr", IT: "it", Manager: "manager" };
+
+    const results = await Promise.all(
+      Object.entries(ROLE_TO_GROUP).map(async ([roleParam, group]) => {
+        try {
+          const data = await request(`/approvals/pending/${roleParam}`);
+          const list = Array.isArray(data) ? data : data ? [data] : [];
+          return list.map((item) => ({
+            ...item,
+            tasks: Array.isArray(item.tasks)
+              ? item.tasks.map((t) => ({ ...t, _roleGroup: t._roleGroup || group }))
+              : item.tasks,
+          }));
+        } catch (err) {
+          console.warn(`approvalsForEmployee: failed to fetch role "${roleParam}"`, err);
+          return [];
+        }
+      })
+    );
+
+    const merged = results.flat().filter(Boolean);
+    return employeeId
+      ? merged.filter((item) => item.employee_id === employeeId)
+      : merged;
+  },
+
+  approvalsForRole: (role) => request(`/approvals/pending/${role}`), // keep this — still used elsewhere (e.g. the /approvals directory list page)
+
   approvalsForRole: (role) => request(`/approvals/pending/${role}`),
   insightsSummary: () => request("/insights/summary"),
   employeeDecisions: (id) => request(`/employees/${id}/decisions`),
@@ -75,4 +105,5 @@ export const api = {
     }),
   auditTrail: (id) => request(`/audit/${id}`),
   dashboardSummary: () => request("/dashboard/summary"),
+
 };

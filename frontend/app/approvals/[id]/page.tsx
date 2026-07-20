@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api } from "../../../lib/api";
+import { api, API_BASE } from "../../../lib/api";
 import { useAuth } from "../../../lib/useAuth";
 
 function initials(name: string) {
@@ -46,44 +46,17 @@ function normalizeTasks(rawTasks: any): any[] {
   return [];
 }
 
-const HR_KEYWORDS = [
-  "aadhaar", "pan card", "education", "offer letter", "employment", "passport",
-  "government id", "relieving", "hr portal", "hr document", "background check",
-  "security clearance", "nda", "confidentiality", "access badge", "security training",
-  "police verification", "reference check", "security token", "clearance",
-  "document", "verification", "onboarding form", "id proof", "address proof",
-];
-const IT_KEYWORDS = [
-  "laptop", "vpn", "jetbrains", "ide", "admin panel", "building access",
-  "workstation", "license", "hardware", "software", "asset allocation", "asset",
-  "assign application", "application access", "app access", "corporate email account",
-  "email account setup", "outlook", "teams", "sharepoint", "onedrive", "monitor",
-  "dock", "headset", "mobile device", "provision", "system access", "erp",
-  "time entry", "billing system", "create user account", "user account",
-  "account creation", "user id", "application account", "email account",
-  "microsoft 365", "active directory", "ad account", "directory account",
-  "account", "email setup", "mailbox", "domain account", "login",
-];
-const DELIVERY_KEYWORDS = [
-  "team assignment", "onboarding track", "buddy", "mentor", "manager",
-  "delivery team", "project allocation", "project assign", "team lead",
-];
-
 type StageKey = "hr" | "it" | "delivery";
 type WorkflowType = "onboarding" | "offboarding";
-
-function matchesAny(name: string, keywords: string[]) {
-  return keywords.some((k) => name.includes(k));
-}
 
 function classifyStage(t: any): StageKey {
   const group = (t._roleGroup || "").toLowerCase();
   if (group === "hr" || group === "security") return "hr";
   if (group === "it") return "it";
   if (group === "manager" || group === "delivery") return "delivery";
-  
+
   if (t.task_type === "email_draft") return "hr";
-  
+
   const explicit = (t.stage || t.category || "").toLowerCase();
   if (explicit) {
     if (explicit.includes("hr") || explicit.includes("document") || explicit.includes("security") || explicit.includes("clearance"))
@@ -93,19 +66,7 @@ function classifyStage(t: any): StageKey {
     if (explicit.includes("manager") || explicit.includes("team") || explicit.includes("delivery") || explicit.includes("project"))
       return "delivery";
   }
-  
-  const name = (t.task_name || "").toLowerCase();
-  
-  if (matchesAny(name, IT_KEYWORDS)) return "it";
-  if (matchesAny(name, DELIVERY_KEYWORDS)) return "delivery";
-  if (matchesAny(name, HR_KEYWORDS)) return "hr";
-  
-  if (name.includes("account") && (name.includes("create") || name.includes("setup") || name.includes("provision"))) return "it";
-  if (name.includes("email") && (name.includes("create") || name.includes("setup"))) return "it";
-  if (name.includes("access") || name.includes("license") || name.includes("software") || name.includes("hardware")) return "it";
-  if (name.includes("document") || name.includes("certificate") || name.includes("verification") || name.includes("check")) return "hr";
-  if (name.includes("team") || name.includes("project") || name.includes("buddy") || name.includes("mentor")) return "delivery";
-  
+
   if (typeof window !== "undefined") {
     console.warn(`[classifyStage] Unmatched task, defaulting to HR:`, t.task_name, t);
   }
@@ -138,7 +99,7 @@ function getStageDisplay(
     (r === "hr" && stage === "hr") ||
     (r === "it" && stage === "it") ||
     ((r === "manager" || r === "delivery") && stage === "delivery");
-  
+
   // Stage selector NEVER shows "Locked" text - always shows approval status
   if (currentStage) {
     if (status === "completed") {
@@ -146,34 +107,34 @@ function getStageDisplay(
     }
     return { text: `Waiting for ${STAGE_APPROVER[stage]} Approval`, textColor: "text-red-600", circleColor: "bg-red-500 text-white" };
   }
-  
+
   if (status === "completed") {
     return { text: "Approved", textColor: "text-green-600", circleColor: "bg-green-600 text-white" };
   }
-  
+
   // For non-current stages: always show waiting text, never "Locked"
   return { text: `Waiting for ${STAGE_APPROVER[stage]} Approval`, textColor: "text-gray-400", circleColor: "bg-white border-2 border-gray-200 text-gray-400" };
 }
 
 function deriveOverallStatus(item: any): string {
   if (!item) return "Unknown";
-  
+
   const directStatus = item.status || item.approval_status || item.employee_status || item.overall_status;
   if (typeof directStatus === "string" && directStatus.trim()) {
     return directStatus;
   }
-  
+
   const tasks = item.tasks;
   if (!Array.isArray(tasks) || tasks.length === 0) return "Unknown";
-  
+
   const allApproved = tasks.every((t: any) => t.status === "approved" || t.status === "verified");
   const allRejected = tasks.every((t: any) => t.status === "rejected");
   const anyPending = tasks.some((t: any) => t.status === "pending");
-  
+
   if (allApproved) return "Cleared";
   if (allRejected) return "Rejected";
   if (anyPending) return "Pending";
-  
+
   return "In Progress";
 }
 
@@ -408,6 +369,16 @@ function TaskDetailPanel({
           {task.ai_recommendation}
         </div>
       )}
+      {task.task_type === "document_validation" && task.document_id && (
+  <a
+    href={`${API_BASE}/onboarding/${employeeId}/documents/${task.document_id}/file`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-block mt-1 text-xs font-semibold text-[#6D4FC7] hover:underline"
+  >
+    View Document
+  </a>
+)}
 
       {task.task_type === "single_select" && task.options && (
         <div className="mb-3">
@@ -726,7 +697,7 @@ export default function EmployeeApprovalPage() {
               <div className="mr-auto">
                 <div className="text-xl font-bold text-[#14213D]">{header.employee_name}</div>
                 <div className="text-sm text-gray-500">
-                  {header.employee_id ?? "—"}
+                  {header.emp_id ?? "—"}
                   {header.email ? ` · ${header.email}` : ""}
                 </div>
               </div>
@@ -855,8 +826,8 @@ export default function EmployeeApprovalPage() {
               {/* Sequential dependency lock message */}
               {!activeRoleLocked && activeSequentiallyLocked && (
                 <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
-                  {activeStageIndex === 0 
-                    ? "This stage will open once previous requirements are met." 
+                  {activeStageIndex === 0
+                    ? "This stage will open once previous requirements are met."
                     : `This stage opens for editing once ${STAGES[activeStageIndex - 1]?.title} is completed. You can still review what's queued here.`}
                 </div>
               )}

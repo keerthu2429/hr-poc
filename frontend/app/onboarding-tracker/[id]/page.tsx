@@ -61,6 +61,12 @@ function getEmployeeCode(e: any): string {
   return e.employeeId ?? e.employee_id ?? e.empId ?? e.emp_id ?? e.employeeCode ?? e.employee_code ?? e.code ?? e.id ?? "—";
 }
 
+function formatDocumentSource(source: string): string {
+  if (source === "hrms_sync") return "synced from HRMS";
+  if (source === "email") return "via email";
+  return source;
+}
+
 function StepIcon({ step, color, size = 18 }: { step: string; color: string; size?: number }) {
   const path = STEP_ICON[step];
   if (!path) return null;
@@ -387,6 +393,12 @@ export default function OnboardingTrackerDetailPage() {
                 {documentInfo.documents.map((d: any, idx: number) => (
                   <div key={idx} style={{ fontSize: 13, color: d.status === "received" ? "#16a34a" : "#c2410c" }}>
                     {d.status === "received" ? "✅" : "⏳"} {d.document_name} — {d.status}
+                    {d.source && (
+                      <span style={{ color: "#6b7280", marginLeft: 6 }}>
+                        ({formatDocumentSource(d.source)}
+                        {d.confidence ? `, confidence: ${d.confidence}` : ""})
+                      </span>
+                    )}
                   </div>
                 ))}
               </>
