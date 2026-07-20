@@ -9,6 +9,7 @@ it here anymore.
 compliance_completion_pct likewise combines category="compliance" rows
 from both task tables, matching what the Compliance Dashboard shows.
 """
+from app import database
 import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -45,33 +46,93 @@ def _daily_trend(db: Session, tracker_model, step_name: str, days: int = TREND_D
 def get_dashboard_summary(db: Session = Depends(get_db)):
     today = datetime.datetime.utcnow().date()
 
-    total_employees = db.query(Employee).count()
+    total_employees = (
+        db.query(Employee)
+        .filter(Employee.status.in_(["onboarding", "offboarding"]))
+        .count()
+    )
+    total_onboarded = (
+        db.query(Employee)
+        .filter(Employee.status == "active")
+        .count()
+    )
+    total_offboarded = (
+        db.query(Employee)
+        .filter(Employee.status == "exited")
+        .count()
+    )
     pending_onboarding = db.query(Employee).filter(Employee.status == "onboarding").count()
     pending_offboarding = db.query(Employee).filter(Employee.status == "offboarding").count()
 
-    pending_onboarding_tasks = db.query(OnboardingTask).filter(OnboardingTask.status == "pending").count()
-    pending_offboarding_tasks = db.query(OffboardingTask).filter(OffboardingTask.status == "pending").count()
-    pending_approvals = pending_onboarding_tasks + pending_offboarding_tasks
+    # pending_onboarding_tasks = db.query(OnboardingTask).filter(OnboardingTask.status == "pending").count()
+    # pending_offboarding_tasks = db.query(OffboardingTask).filter(OffboardingTask.status == "pending").count()
+    # pending_approvals = pending_onboarding_tasks + pending_offboarding_tasks
 
-    pending_hr_approvals = (
-    db.query(distinct(OnboardingTask.employee_id))
-    .filter(
-        OnboardingTask.status == "pending",
-        OnboardingTask.track == "HR"
-    )
-    .count()
+    # pending_hr_approvals = (
+    # db.query(distinct(OnboardingTask.employee_id))
+    # .filter(
+    #     OnboardingTask.status == "pending",
+    #     OnboardingTask.track == "HR"
+    # )
+    # .count()
+    # )
+
+    # pending_it_approvals = (
+    # db.query(distinct(OnboardingTask.employee_id))
+    # .filter(
+    #     OnboardingTask.status == "pending",
+    #     OnboardingTask.track == "IT"
+    # )
+    # .count()
+    # )
+
+    # pending_onboarding_tasks_hr_it = pending_hr_approvals + pending_it_approvals
+
+    pending_hr = (
+        db.query(distinct(OnboardingTask.employee_id))
+        .join(Employee, Employee.id == OnboardingTask.employee_id)
+        .filter(
+            Employee.status == "onboarding",
+            OnboardingTask.track == "HR",
+            OnboardingTask.status == "pending",
+        )
+        .count()
     )
 
-    pending_it_approvals = (
-    db.query(distinct(OnboardingTask.employee_id))
-    .filter(
-        OnboardingTask.status == "pending",
-        OnboardingTask.track == "IT"
-    )
-    .count()
+    pending_hr += (
+        db.query(distinct(OffboardingTask.employee_id))
+        .join(Employee, Employee.id == OffboardingTask.employee_id)
+        .filter(
+            Employee.status == "offboarding",
+            OffboardingTask.track == "HR",
+            OffboardingTask.status == "pending",
+        )
+        .count()
     )
 
-    pending_onboarding_tasks_hr_it = pending_hr_approvals + pending_it_approvals
+    pending_it = (
+        db.query(distinct(OnboardingTask.employee_id))
+        .join(Employee, Employee.id == OnboardingTask.employee_id)
+        .filter(
+            Employee.status == "onboarding",
+            OnboardingTask.track == "IT",
+            OnboardingTask.status == "pending",
+        )
+        .count()    
+    )
+
+    pending_it += (
+        db.query(distinct(OffboardingTask.employee_id))
+        .join(Employee, Employee.id == OffboardingTask.employee_id)
+        .filter(
+            Employee.status == "offboarding",
+            OffboardingTask.track == "IT",
+            OffboardingTask.status == "pending",
+        )
+        .count()
+    )
+
+    pending_approvals = pending_hr + pending_it
 
     high_risk_employees = db.query(RiskAssessment).filter(RiskAssessment.risk_level == "High").count()
 
@@ -112,11 +173,13 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
 
     return {
         "total_employees": total_employees,
+        "total_onboarded": total_onboarded,
+        "total_offboarded": total_offboarded,
         "onboarded_today": onboarded_today,
         "offboarded_today": offboarded_today,
         "pending_onboarding": pending_onboarding,
         "pending_offboarding": pending_offboarding,
-        "pending_onboarding_hr_it": pending_onboarding_tasks_hr_it,
+        # "pending_onboarding_hr_it": pending_onboarding_tasks_hr_it,
         "pending_approvals": pending_approvals,
         "high_risk_employees": high_risk_employees,
         "compliance_completion_pct": compliance_completion_pct,
