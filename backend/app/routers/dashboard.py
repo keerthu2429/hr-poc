@@ -173,8 +173,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         db.query(distinct(EmployeeDocument.employee_id))
         .join(Employee, Employee.id == EmployeeDocument.employee_id)
         .filter(
-            Employee.status == "onboarding",
-            EmployeeDocument.status.in_(["pending", "under_review"])
+            Employee.status == "documents_pending"
         )
         .count()
     )
