@@ -36,6 +36,20 @@ function buildDefaultEmailDraft(task: any, employeeName?: string | null) {
   return { subject, body };
 }
 
+// Per the OpenAPI spec, task_type "email_draft" covers three distinct kinds
+// that use different backend endpoints: Welcome Email (outbound only, no
+// reply expected), Missing Document Request Email (checked via
+// /documents/check-inbox), and Onboarding Feedback Request (checked via the
+// separate /feedback/check-inbox). Routed by task_name since that's the only
+// signal we have to distinguish them.
+function getEmailTaskKind(task: any): "welcome" | "missing_docs" | "feedback" | "other" {
+  const name = (task.task_name || "").toLowerCase();
+  if (name.includes("feedback")) return "feedback";
+  if (name.includes("missing") || name.includes("document")) return "missing_docs";
+  if (name.includes("welcome")) return "welcome";
+  return "other";
+}
+
 function normalizeTasks(rawTasks: any): any[] {
   if (Array.isArray(rawTasks)) return rawTasks;
   if (rawTasks && typeof rawTasks === "object") {
@@ -51,17 +65,21 @@ type WorkflowType = "onboarding" | "offboarding";
 
 function classifyStage(t: any): StageKey {
   const group = (t._roleGroup || "").toLowerCase();
-  if (group === "hr" || group === "security") return "hr";
-  if (group === "it") return "it";
+  // "security" tasks (Assign Security Groups, Ethical Wall Assignment,
+  // Privileged Access Review) are folded into the IT stage. See ROLE_STAGE_MAP
+  // below for the matching permission fix that lets a Security-role user
+  // actually edit them.
+  if (group === "hr") return "hr";
+  if (group === "it" || group === "security") return "it";
   if (group === "manager" || group === "delivery") return "delivery";
 
   if (t.task_type === "email_draft") return "hr";
 
   const explicit = (t.stage || t.category || "").toLowerCase();
   if (explicit) {
-    if (explicit.includes("hr") || explicit.includes("document") || explicit.includes("security") || explicit.includes("clearance"))
+    if (explicit.includes("hr") || explicit.includes("document"))
       return "hr";
-    if (explicit.includes("it") || explicit.includes("provision") || explicit.includes("system") || explicit.includes("tech"))
+    if (explicit.includes("it") || explicit.includes("provision") || explicit.includes("system") || explicit.includes("tech") || explicit.includes("security") || explicit.includes("clearance"))
       return "it";
     if (explicit.includes("manager") || explicit.includes("team") || explicit.includes("delivery") || explicit.includes("project"))
       return "delivery";
@@ -79,8 +97,9 @@ const STAGES: { key: StageKey; eyebrow: string; title: string }[] = [
   { key: "delivery", eyebrow: "STAGE 3 · TEAM ASSIGNMENT", title: "Delivery Team" },
 ];
 
+// IT stage is jointly approved by IT and Security.
 const STAGE_APPROVER: Record<StageKey, string> = {
-  hr: "HR", it: "IT", delivery: "Manager",
+  hr: "HR", it: "IT/Security", delivery: "Manager",
 };
 
 type StageDisplay = {
@@ -98,6 +117,7 @@ function getStageDisplay(
   const currentStage =
     (r === "hr" && stage === "hr") ||
     (r === "it" && stage === "it") ||
+    (r === "security" && stage === "it") ||
     ((r === "manager" || r === "delivery") && stage === "delivery");
 
   // Stage selector NEVER shows "Locked" text - always shows approval status
@@ -124,8 +144,10 @@ function deriveOverallStatus(item: any): string {
     return directStatus;
   }
 
-  const tasks = item.tasks;
-  if (!Array.isArray(tasks) || tasks.length === 0) return "Unknown";
+  // item.tasks may be the raw grouped object from /onboarding|offboarding/{id}/tasks
+  // (e.g. { HR: [...], IT: [...] }) rather than a flat array -- normalize first.
+  const tasks = normalizeTasks(item.tasks);
+  if (tasks.length === 0) return "Unknown";
 
   const allApproved = tasks.every((t: any) => t.status === "approved" || t.status === "verified");
   const allRejected = tasks.every((t: any) => t.status === "rejected");
@@ -161,8 +183,11 @@ function getStatusBadgeStyle(status: string | undefined | null): { bg: string; t
   }
 }
 
+// "security" -> "it" so a Security-role user's stage lock resolves to the
+// IT stage (where Security tasks now live) instead of falling through to
+// null (which would lock every stage for them).
 const ROLE_STAGE_MAP: Record<string, StageKey> = {
-  hr: "hr", it: "it", manager: "delivery", delivery: "delivery", "delivery team": "delivery",
+  hr: "hr", it: "it", security: "it", manager: "delivery", delivery: "delivery", "delivery team": "delivery",
 };
 
 function stageForRole(role?: string | null): StageKey | null {
@@ -271,7 +296,17 @@ function TaskDetailPanel({
     task.status === "pending" &&
     (task.task_type === "multi_select" || task.task_type === "single_select");
 
-  const emailEditable = !roleLocked && task.status === "pending";
+  // Email actions are onboarding-only -- confirmed via the OpenAPI spec that
+  // there's no /offboarding/.../email-draft or /offboarding/.../check-inbox
+  // route. Task selection/decide DO exist for both workflows, so those stay
+  // workflow-aware below.
+  const emailSupported = workflow === "onboarding";
+  const emailKind = isEmailDraft ? getEmailTaskKind(task) : null;
+  // Welcome Email is outbound-only (no reply flow); Missing Document Request
+  // Email and Onboarding Feedback Request each check a different inbox.
+  const showCheckInbox =
+    isEmailDraft && emailSupported && (emailKind === "missing_docs" || emailKind === "feedback");
+  const emailEditable = !roleLocked && task.status === "pending" && emailSupported;
   const isDecided =
     task.status === "approved" || task.status === "rejected" || task.status === "verified";
 
@@ -317,7 +352,9 @@ function TaskDetailPanel({
     if (!emailEditable) return;
     setEmailSaving(true);
     try {
-      await api.updateEmailDraft(employeeId, emailSubject, emailBody);
+      // Generic endpoint -- resolves through the task itself, so it's correct
+      // for all three email_draft kinds (Welcome / Missing Docs / Feedback).
+      await api.updateTaskEmailDraft(employeeId, task.id, emailSubject, emailBody);
       onChanged();
     } finally {
       setEmailSaving(false);
@@ -325,11 +362,12 @@ function TaskDetailPanel({
   }
 
   async function handleCheckInbox() {
-    if (roleLocked) return;
+    if (roleLocked || !showCheckInbox) return;
     setCheckingInbox(true);
     setInboxMessage(null);
     try {
-      const result = await api.checkInbox(employeeId);
+      const checkInboxFn = emailKind === "feedback" ? api.checkFeedbackInbox : api.checkInbox;
+      const result = await checkInboxFn(employeeId);
       const replyFound = result?.replyFound ?? result?.reply_found ?? false;
       if (replyFound) {
         onChanged();
@@ -352,7 +390,7 @@ function TaskDetailPanel({
             <span className="uppercase tracking-wider">AI Recommended Access</span>
           </span>
         </div>
-        {isEmailDraft && (
+        {showCheckInbox && (
           <button
             onClick={handleCheckInbox}
             disabled={roleLocked || checkingInbox}
@@ -420,6 +458,12 @@ function TaskDetailPanel({
             </label>
           ))}
         </div>
+      )}
+
+      {isEmailDraft && !emailSupported && (
+        <p className="mb-3 text-xs text-amber-600">
+          Email actions (editing, sending, checking replies) aren't available for offboarding tasks yet.
+        </p>
       )}
 
       {isEmailDraft && (
@@ -522,31 +566,64 @@ export default function EmployeeApprovalPage() {
     return myStage !== key;
   }
 
+  // Fix #3: this page used to build its data by fetching
+  // /approvals/pending/{role} for HR/IT/Manager and filtering client-side by
+  // employee_id. That was lossy (no Security group -> fix #1) and wasteful
+  // (pulled every employee's pending items just to find one). Now it fetches
+  // this employee's full task set directly.
   async function load() {
-    if (!role) return;
     setLoading(true);
     try {
-      let data: any[] = [];
-      if (typeof (api as any).approvalsForEmployee === "function") {
-        data = await (api as any).approvalsForEmployee(employeeId);
-      } else {
-        data = await api.approvalsForRole(role);
+      const [employee, onboardingRes, offboardingRes] = await Promise.all([
+        api.getEmployee(employeeId).catch(() => null),
+        api.onboardingTasks(employeeId).catch(() => null),
+        api.offboardingTasks(employeeId).catch(() => null),
+      ]);
+
+      // Confirmed against EmployeeOut in the spec: name, employee_id, email,
+      // department, role, experience_level.
+      const baseHeader = {
+        employee_id: employeeId,
+        employee_name: employee?.name,
+        emp_id: employee?.employee_id,
+        department: employee?.department,
+        role: employee?.role,
+        experience_level: employee?.experience_level,
+        email: employee?.email,
+      };
+
+      const newItems: any[] = [];
+
+      if (onboardingRes) {
+        newItems.push({
+          ...baseHeader,
+          workflow_type: "onboarding",
+          status: onboardingRes.status || onboardingRes.overall_status,
+          tasks: onboardingRes.tasks, // grouped by role: HR / IT / Security / Manager
+        });
       }
-      const normalized = Array.isArray(data) ? data : data ? [data] : [];
-      setItems(normalized);
+      if (offboardingRes) {
+        newItems.push({
+          ...baseHeader,
+          workflow_type: "offboarding",
+          status: offboardingRes.status || offboardingRes.overall_status,
+          tasks: offboardingRes.tasks,
+        });
+      }
+
+      setItems(newItems);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, [role]);
+  // No longer depends on `role` -- fetching is per-employee now, not
+  // per-approver-role, so there's nothing to re-fetch when role changes.
+  useEffect(() => { load(); }, [employeeId]);
 
-  const employeeItems = useMemo(
-    () => items.filter((item: any) => item.employee_id === employeeId),
-    [items, employeeId]
-  );
-
-  const header = employeeItems[0];
+  // Data is already scoped to this employee; kept as its own memo so the
+  // rest of the component (which reads `employeeItems`) doesn't need to change.
+  const employeeItems = useMemo(() => items, [items]);
 
   const availableWorkflows = useMemo(() => {
     const set = new Set<WorkflowType>(employeeItems.map((i: any) => i.workflow_type));
@@ -654,6 +731,13 @@ export default function EmployeeApprovalPage() {
     [activeTasks, selectedTaskId]
   );
 
+  // Fix #4: header/overallStatus used to come from employeeItems[0]
+  // regardless of which workflow tab was active, so the status badge could
+  // be stuck showing the wrong workflow's status after switching tabs.
+  const header = useMemo(
+    () => employeeItems.find((i: any) => i.workflow_type === activeWorkflow) || employeeItems[0],
+    [employeeItems, activeWorkflow]
+  );
   const overallStatus = useMemo(() => deriveOverallStatus(header), [header]);
   const statusBadge = useMemo(() => getStatusBadgeStyle(overallStatus), [overallStatus]);
 
