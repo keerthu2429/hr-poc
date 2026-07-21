@@ -235,6 +235,72 @@ class FeedbackResponse(Base):
     received_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class EquipmentConfirmationEmail(Base):
+    """Sent once IT approves the Asset Allocation task -- asks the
+    employee to confirm their equipment arrived and everything's
+    working. Mirrors FeedbackEmail's drafted->sent->replied lifecycle
+    and message_id threading, since we need to match a reply back to
+    this specific request."""
+    __tablename__ = "equipment_confirmation_emails"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    employee_id = Column(String, ForeignKey("employees.id"), nullable=False)
+    subject = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    status = Column(String, default="drafted")  # drafted | sent | replied
+    message_id = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sent_at = Column(DateTime, nullable=True)
+    replied_at = Column(DateTime, nullable=True)
+
+
+class EquipmentConfirmationResponse(Base):
+    """The employee's reply, plus the AI's read on whether they
+    acknowledged receipt cleanly or flagged an issue (damaged/missing
+    item). raw_text is kept verbatim; acknowledged/issue_summary are
+    AI-derived and shown on top of it, same pattern as FeedbackResponse."""
+    __tablename__ = "equipment_confirmation_responses"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    employee_id = Column(String, ForeignKey("employees.id"), nullable=False)
+    equipment_confirmation_email_id = Column(String, ForeignKey("equipment_confirmation_emails.id"), nullable=False)
+    raw_text = Column(Text, nullable=False)
+    acknowledged = Column(String, default="true")  # "true" | "false" -- stored as string like is_ai_generated elsewhere in this file
+    issue_summary = Column(Text, nullable=True)  # set only if an issue was reported (damaged/missing/etc.)
+    received_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class OrgDocumentsEmail(Base):
+    """Shares the full set of organizational policy documents
+    (backend/policies/*.md) with a new hire. One-way, no reply
+    expected -- same shape as WelcomeEmail."""
+    __tablename__ = "org_documents_emails"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    employee_id = Column(String, ForeignKey("employees.id"), nullable=False)
+    subject = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    status = Column(String, default="drafted")  # drafted | sent
+    generated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sent_at = Column(DateTime, nullable=True)
+
+
+class FirstDayAgendaEmail(Base):
+    """AI-generated, role/department-personalized first-day schedule.
+    One-way, no reply expected -- same shape as WelcomeEmail. Not tied
+    to any real calendar system (none exists in this app) -- this is a
+    generated text agenda, not a scheduled-meetings integration."""
+    __tablename__ = "first_day_agenda_emails"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    employee_id = Column(String, ForeignKey("employees.id"), nullable=False)
+    subject = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    status = Column(String, default="drafted")  # drafted | sent
+    generated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sent_at = Column(DateTime, nullable=True)
+
+
 class OnboardingTask(Base):
     """One row per task per track (HR/IT/Security/Manager). This is the
     single source of truth both the Onboarding Tracker (read-only display)

@@ -11,16 +11,20 @@ from app.config import get_document_keywords
 from app.database import get_db
 from app.models import (
     OnboardingTracker, Employee, EmployeeDocument, OnboardingTask, DocumentRequestEmail, ReceivedAttachment,
-    WelcomeEmail, FeedbackEmail, FeedbackResponse,
+    WelcomeEmail, FeedbackEmail, FeedbackResponse, AssetAllocation,
+    EquipmentConfirmationEmail, EquipmentConfirmationResponse, OrgDocumentsEmail, FirstDayAgendaEmail,
 )
 from app.schemas.employee import TaskDecision, TaskSelectionUpdate, EmailDraftUpdate
 from app.orchestrators.onboarding_orchestrator import (
     run_onboarding, resume_after_documents, _create_document_validation_task,
     _draft_and_queue_missing_document_email, draft_and_queue_feedback_email,
+    draft_and_queue_equipment_confirmation_email, _add_task,
 )
 from app.services.track_status import get_all_track_statuses, recompute_employee_status
 from app.services.license_manager import allocate_seats
 from app.agents.feedback_survey_agent import summarize_feedback_response
+from app.agents.equipment_confirmation_agent import interpret_confirmation_reply
+from app.agents.org_documents_agent import get_policy_document_paths
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -119,6 +123,27 @@ def get_tasks(employee_id: str, db: Session = Depends(get_db)):
                     .order_by(FeedbackEmail.generated_at.desc())
                     .first()
                 )
+            elif t.task_name == "Organizational Documents":
+                email_record = (
+                    db.query(OrgDocumentsEmail)
+                    .filter(OrgDocumentsEmail.employee_id == employee_id)
+                    .order_by(OrgDocumentsEmail.generated_at.desc())
+                    .first()
+                )
+            elif t.task_name == "First-Day Agenda":
+                email_record = (
+                    db.query(FirstDayAgendaEmail)
+                    .filter(FirstDayAgendaEmail.employee_id == employee_id)
+                    .order_by(FirstDayAgendaEmail.generated_at.desc())
+                    .first()
+                )
+            elif t.task_name == "Equipment Confirmation":
+                email_record = (
+                    db.query(EquipmentConfirmationEmail)
+                    .filter(EquipmentConfirmationEmail.employee_id == employee_id)
+                    .order_by(EquipmentConfirmationEmail.generated_at.desc())
+                    .first()
+                )
             else:  # "Missing Document Request Email"
                 email_record = (
                     db.query(DocumentRequestEmail)
@@ -188,6 +213,22 @@ def decide_task(employee_id: str, task_id: str, payload: TaskDecision, db: Sessi
         if app_names:
             allocate_seats(db, app_names)
 
+    # --- NEW: mark equipment allocated + fire confirmation email when IT approves it ---
+    if task.task_name == "Asset Allocation" and payload.status == "approved":
+        asset_names = json.loads(task.selected_options) if task.selected_options else []
+        asset_record = (
+            db.query(AssetAllocation)
+            .filter(AssetAllocation.employee_id == employee_id)
+            .order_by(AssetAllocation.created_at.desc())
+            .first()
+        )
+        if asset_record:
+            asset_record.status = "allocated"  # was never actually set anywhere before this
+            db.commit()
+        if asset_names:
+            employee = db.query(Employee).filter(Employee.id == employee_id).first()
+            draft_and_queue_equipment_confirmation_email(db, employee, asset_names)
+
     if task.task_type == "email_draft" and payload.status == "approved":
         # Dispatch by task_name -- there are now three kinds of email_draft
         # task (document request, welcome, feedback request), each backed
@@ -215,6 +256,64 @@ def decide_task(employee_id: str, task_id: str, payload: TaskDecision, db: Sessi
                 db.query(FeedbackEmail)
                 .filter(FeedbackEmail.employee_id == employee_id, FeedbackEmail.status == "drafted")
                 .order_by(FeedbackEmail.generated_at.desc())
+                .first()
+            )
+            if email_record:
+                employee = db.query(Employee).filter(Employee.id == employee_id).first()
+                try:
+                    message_id = email_client.send_email(employee.email, email_record.subject, email_record.body)
+                    email_record.status = "sent"
+                    email_record.message_id = message_id
+                    email_record.sent_at = datetime.datetime.utcnow()
+                    db.commit()
+                except email_client.EmailClientError as e:
+                    raise HTTPException(status_code=502, detail=f"Email send failed: {e}")
+
+        elif task.task_name == "Organizational Documents":
+            email_record = (
+                db.query(OrgDocumentsEmail)
+                .filter(OrgDocumentsEmail.employee_id == employee_id, OrgDocumentsEmail.status == "drafted")
+                .order_by(OrgDocumentsEmail.generated_at.desc())
+                .first()
+            )
+            if email_record:
+                employee = db.query(Employee).filter(Employee.id == employee_id).first()
+                try:
+                    # Re-read the policies directory fresh at send time (not
+                    # whatever was there when the draft was created) --
+                    # attaches the real files, not just names them in the body.
+                    attachment_paths = get_policy_document_paths()
+                    email_client.send_email(
+                        employee.email, email_record.subject, email_record.body, attachments=attachment_paths,
+                    )
+                    email_record.status = "sent"
+                    email_record.sent_at = datetime.datetime.utcnow()
+                    db.commit()
+                except email_client.EmailClientError as e:
+                    raise HTTPException(status_code=502, detail=f"Email send failed: {e}")
+
+        elif task.task_name == "First-Day Agenda":
+            email_record = (
+                db.query(FirstDayAgendaEmail)
+                .filter(FirstDayAgendaEmail.employee_id == employee_id, FirstDayAgendaEmail.status == "drafted")
+                .order_by(FirstDayAgendaEmail.generated_at.desc())
+                .first()
+            )
+            if email_record:
+                employee = db.query(Employee).filter(Employee.id == employee_id).first()
+                try:
+                    email_client.send_email(employee.email, email_record.subject, email_record.body)
+                    email_record.status = "sent"
+                    email_record.sent_at = datetime.datetime.utcnow()
+                    db.commit()
+                except email_client.EmailClientError as e:
+                    raise HTTPException(status_code=502, detail=f"Email send failed: {e}")
+
+        elif task.task_name == "Equipment Confirmation":
+            email_record = (
+                db.query(EquipmentConfirmationEmail)
+                .filter(EquipmentConfirmationEmail.employee_id == employee_id, EquipmentConfirmationEmail.status == "drafted")
+                .order_by(EquipmentConfirmationEmail.generated_at.desc())
                 .first()
             )
             if email_record:
@@ -547,4 +646,88 @@ def get_feedback_for_employee(employee_id: str, db: Session = Depends(get_db)):
     return {
         "raw_text": response.raw_text, "summary": response.summary,
         "sentiment": response.sentiment, "received_at": response.received_at,
+    }
+
+
+@router.post("/{employee_id}/equipment/check-inbox")
+def check_equipment_inbox(employee_id: str, db: Session = Depends(get_db)):
+    """Mirrors check_feedback_inbox's atomic-claim pattern (sent ->
+    checking, rowcount-checked update) -- same duplicate-reply race
+    condition this protects against."""
+    email_record = (
+        db.query(EquipmentConfirmationEmail)
+        .filter(EquipmentConfirmationEmail.employee_id == employee_id, EquipmentConfirmationEmail.status == "sent")
+        .order_by(EquipmentConfirmationEmail.sent_at.desc())
+        .first()
+    )
+    if not email_record or not email_record.message_id:
+        return {"checked": True, "reply_found": False, "reason": "No sent equipment confirmation awaiting reply for this employee"}
+
+    claimed = db.query(EquipmentConfirmationEmail).filter(
+        EquipmentConfirmationEmail.id == email_record.id, EquipmentConfirmationEmail.status == "sent"
+    ).update({"status": "checking"})
+    db.commit()
+    if claimed == 0:
+        return {"checked": True, "reply_found": False, "reason": "Already being checked by another request right now"}
+
+    try:
+        reply = email_client.check_for_reply(email_record.message_id)
+    except email_client.EmailClientError as e:
+        email_record.status = "sent"
+        db.commit()
+        raise HTTPException(status_code=502, detail=str(e))
+
+    if not reply or not reply.get("body_text"):
+        email_record.status = "sent"
+        db.commit()
+        return {"checked": True, "reply_found": False}
+
+    verdict = interpret_confirmation_reply(reply["body_text"])
+    db.add(EquipmentConfirmationResponse(
+        employee_id=employee_id, equipment_confirmation_email_id=email_record.id,
+        raw_text=reply["body_text"],
+        acknowledged="true" if verdict.get("acknowledged") else "false",
+        issue_summary=verdict.get("issue_summary"),
+    ))
+    email_record.status = "replied"
+    email_record.replied_at = datetime.datetime.utcnow()
+
+    if not verdict.get("acknowledged") and verdict.get("issue_summary"):
+        # A real problem was reported -- flag it on the asset record and
+        # create a follow-up IT task rather than silently letting the
+        # confirmation loop close as if everything were fine.
+        asset_record = (
+            db.query(AssetAllocation)
+            .filter(AssetAllocation.employee_id == employee_id)
+            .order_by(AssetAllocation.created_at.desc())
+            .first()
+        )
+        if asset_record:
+            asset_record.status = "damaged"
+        _add_task(
+            db, employee_id, "IT", "Resolve Equipment Issue",
+            is_mandatory=True, is_ai_generated=True, task_type="simple",
+            ai_recommendation=f"Employee reported an equipment issue: {verdict['issue_summary']}",
+        )
+    db.commit()
+
+    return {
+        "checked": True, "reply_found": True,
+        "acknowledged": verdict.get("acknowledged"), "issue_summary": verdict.get("issue_summary"),
+    }
+
+
+@router.get("/{employee_id}/equipment")
+def get_equipment_confirmation_for_employee(employee_id: str, db: Session = Depends(get_db)):
+    response = (
+        db.query(EquipmentConfirmationResponse)
+        .filter(EquipmentConfirmationResponse.employee_id == employee_id)
+        .order_by(EquipmentConfirmationResponse.received_at.desc())
+        .first()
+    )
+    if not response:
+        return None
+    return {
+        "raw_text": response.raw_text, "acknowledged": response.acknowledged == "true",
+        "issue_summary": response.issue_summary, "received_at": response.received_at,
     }

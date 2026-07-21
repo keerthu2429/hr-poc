@@ -32,10 +32,15 @@ from app.agents.document_email_agent import draft_document_request_email
 from app.agents.welcome_email_agent import draft_welcome_email
 from app.agents.feedback_survey_agent import draft_feedback_request_email
 from app.agents.document_validator_agent import validate_document
+from app.agents.equipment_confirmation_agent import draft_equipment_confirmation_email
+from app.agents.org_documents_agent import draft_org_documents_email, get_policy_document_titles
+from app.agents.agenda_agent import draft_first_day_agenda
 from app.services.document_extraction import extract_text, ExtractionError
 from app.services.hrms_document_sync import sync_employee_documents
 from app import email_client
-from app.models import WelcomeEmail, FeedbackEmail
+from app.models import (
+    WelcomeEmail, FeedbackEmail, EquipmentConfirmationEmail, OrgDocumentsEmail, FirstDayAgendaEmail,
+)
 from app.config import (
     get_required_documents, get_roles, get_document_identity_fields,
     get_all_applications, get_all_security_groups, get_all_assets, get_all_project_names,
@@ -77,7 +82,10 @@ def _add_task(db: Session, employee_id: str, track: str, task_name: str,
     For multi_select/single_select tasks, `options` is the FULL catalog
     and `selected_options` is the AI's suggestion, pre-filled but editable
     by the approver before they decide -- 'AI suggests, human decides and
-    can change it', applied consistently across apps/assets/groups/projects."""
+    can change it', applied consistently across apps/assets/groups/projects.
+
+    document_id is set only for task_type == "document_validation" --
+    links the task back to the exact EmployeeDocument being reviewed."""
     db.add(OnboardingTask(
         employee_id=employee_id, track=track, task_name=task_name, status="pending",
         is_mandatory=is_mandatory,
@@ -162,6 +170,8 @@ def run_onboarding(db: Session, employee_id: str):
         return {"status": "failed", "reason": "Missing mandatory field(s)."}
 
     _draft_and_queue_welcome_email(db, employee)
+    _draft_and_queue_org_documents_email(db, employee)
+    _draft_and_queue_first_day_agenda_email(db, employee)
 
     if employee.sync_source == "hrms":
         _sync_and_validate_hrms_documents(db, employee)
@@ -467,6 +477,73 @@ def _draft_and_queue_welcome_email(db: Session, employee: Employee):
         ai_recommendation="Drafted welcome email for the new hire. Review and approve to send.",
     )
     _audit(db, employee.id, "Welcome Email Agent", "Welcome email drafted", "")
+
+
+def _draft_and_queue_org_documents_email(db: Session, employee: Employee):
+    """Fires alongside the welcome email -- shares the full set of
+    organizational policy documents (every new hire gets the same set,
+    confirmed scope, not a per-employee AI-filtered subset). Guarded
+    the same way as the welcome email."""
+    existing = db.query(OrgDocumentsEmail).filter(OrgDocumentsEmail.employee_id == employee.id).first()
+    if existing:
+        return
+    doc_titles = get_policy_document_titles()
+    if not doc_titles:
+        return  # nothing to share -- policies/ directory empty or missing
+    draft = draft_org_documents_email(employee.name, doc_titles)
+    db.add(OrgDocumentsEmail(employee_id=employee.id, subject=draft["subject"], body=draft["body"], status="drafted"))
+    db.commit()
+
+    _add_task(
+        db, employee.id, "HR", "Organizational Documents",
+        is_mandatory=False, is_ai_generated=True, task_type="email_draft",
+        ai_recommendation=f"Drafted, sharing: {', '.join(doc_titles)}. Review and approve to send.",
+    )
+    _audit(db, employee.id, "Org Documents Agent", "Organizational documents email drafted",
+           f"Documents: {', '.join(doc_titles)}")
+
+
+def _draft_and_queue_first_day_agenda_email(db: Session, employee: Employee):
+    """Fires alongside the welcome email -- AI-generated agenda,
+    personalized per role/department (not tied to any real calendar
+    system, none exists in this app). Guarded the same way."""
+    existing = db.query(FirstDayAgendaEmail).filter(FirstDayAgendaEmail.employee_id == employee.id).first()
+    if existing:
+        return
+    draft = draft_first_day_agenda(employee.name, employee.role, employee.department, employee.manager)
+    db.add(FirstDayAgendaEmail(employee_id=employee.id, subject=draft["subject"], body=draft["body"], status="drafted"))
+    db.commit()
+
+    _add_task(
+        db, employee.id, "HR", "First-Day Agenda",
+        is_mandatory=False, is_ai_generated=True, task_type="email_draft",
+        ai_recommendation="Drafted personalized first-day agenda. Review and approve to send.",
+    )
+    _audit(db, employee.id, "Agenda Agent", "First-day agenda email drafted", "")
+
+
+def draft_and_queue_equipment_confirmation_email(db: Session, employee: Employee, asset_list: list[str]):
+    """Fires once IT approves the Asset Allocation task -- not
+    module-private since routers/onboarding.py needs to call it
+    directly (same reasoning as draft_and_queue_feedback_email)."""
+    existing = db.query(EquipmentConfirmationEmail).filter(
+        EquipmentConfirmationEmail.employee_id == employee.id
+    ).first()
+    if existing:
+        return
+    draft = draft_equipment_confirmation_email(employee.name, asset_list)
+    db.add(EquipmentConfirmationEmail(
+        employee_id=employee.id, subject=draft["subject"], body=draft["body"], status="drafted",
+    ))
+    db.commit()
+
+    _add_task(
+        db, employee.id, "IT", "Equipment Confirmation",
+        is_mandatory=False, is_ai_generated=True, task_type="email_draft",
+        ai_recommendation=f"Drafted for assets: {', '.join(asset_list)}. Review and approve to send.",
+    )
+    _audit(db, employee.id, "Equipment Confirmation Agent", "Equipment confirmation email drafted",
+           f"Assets: {', '.join(asset_list)}")
 
 
 def draft_and_queue_feedback_email(db: Session, employee: Employee):

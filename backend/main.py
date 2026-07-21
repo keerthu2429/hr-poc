@@ -18,23 +18,8 @@ from app.routers.onboarding import check_inbox_for_employee, check_feedback_inbo
 from app.services.reminders import send_document_reminders, escalate_overdue_tasks
 from app.routers import (
     auth, employees, hrms_sync, onboarding, offboarding,
-    approvals, reports, audit, dashboard, profile, insights,
-    decisions, compliance,
-    auth,
-    employees,
-    hrms_sync,
-    onboarding,
-    offboarding,
-    access,
-    assets,
-    approvals,
-    reports,
-    audit,
-    dashboard,
-    profile,
-    insights,
-    hr_assistant,   # <-- NEW
-    licenses,
+    access, assets, approvals, reports, audit, dashboard, profile, insights,
+    decisions, compliance, hr_assistant, licenses,
 )
 
 app = FastAPI(title="Onboarding/Offboarding POC API")
@@ -53,6 +38,8 @@ app.include_router(employees.router)
 app.include_router(hrms_sync.router)
 app.include_router(onboarding.router)
 app.include_router(offboarding.router)
+app.include_router(access.router)
+app.include_router(assets.router)
 app.include_router(approvals.router)
 app.include_router(reports.router)
 app.include_router(audit.router)

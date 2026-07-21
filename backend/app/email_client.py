@@ -22,11 +22,14 @@ SECURITY NOTES (read before wiring this to a real inbox):
   receiving attachments from arbitrary external senders.
 """
 import os
+import mimetypes
 import smtplib
 import imaplib
 import email
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from email.utils import make_msgid
 
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -54,9 +57,16 @@ def _check_configured():
         )
 
 
-def send_email(to_address: str, subject: str, body: str) -> str:
+def send_email(to_address: str, subject: str, body: str, attachments: list[str] = None) -> str:
     """Sends a real email. Returns the Message-ID (used later to match
-    the employee's reply back to this specific request via threading)."""
+    the employee's reply back to this specific request via threading).
+
+    attachments: optional list of local file paths to attach (e.g. the
+    real policy documents for Organizational Documents, rather than
+    just naming them in the body text). Reuses the same size limit as
+    incoming attachments; a file that's missing or oversized is skipped
+    with a print warning rather than failing the whole send -- one bad
+    file shouldn't block an otherwise-good email."""
     _check_configured()
 
     msg = MIMEMultipart()
@@ -66,6 +76,22 @@ def send_email(to_address: str, subject: str, body: str) -> str:
     message_id = make_msgid()
     msg["Message-ID"] = message_id
     msg.attach(MIMEText(body, "plain"))
+
+    for file_path in (attachments or []):
+        if not file_path or not os.path.exists(file_path):
+            print(f"[EMAIL] Skipping missing attachment: {file_path}")
+            continue
+        if os.path.getsize(file_path) > MAX_ATTACHMENT_SIZE_BYTES:
+            print(f"[EMAIL] Skipping oversized attachment: {file_path}")
+            continue
+        content_type, _ = mimetypes.guess_type(file_path)
+        main_type, _, sub_type = (content_type or "application/octet-stream").partition("/")
+        part = MIMEBase(main_type, sub_type or "octet-stream")
+        with open(file_path, "rb") as f:
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=os.path.basename(file_path))
+        msg.attach(part)
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
